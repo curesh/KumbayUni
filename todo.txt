@@ -18,3 +18,9 @@ Features:
 3. Tree Structure
 4. Search box for finding video
 5. Upload Video
+
+
+Urgent Todo:
+1. Do some sort of analysis on plot of large rects at end, to fill in the gaps, where it misses detecting the
+large rectangle
+2. Make it faster

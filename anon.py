@@ -169,24 +169,33 @@ class Anon():
             
             if rects[0][3] > ZOOM_HEIGHT:
                 i_last_large_head = 0
+            # right_side_faces = prof_face_cascade.detectMultiScale(gray, 1.1, 4)
+            # left_side_faces = prof_face_cascade.detectMultiScale(cv.flip(gray, 1), 1.1, 4)
+            # for (x,y,w,h) in right_side_faces:
+            #     cv.rectangle(curr_frame, (x,y), (x+w,y+h), (0,255,0),2)
+            # for (x,y,w,h) in left_side_faces:
+            #     cv.rectangle(curr_frame, (x,y), (x+w,y+h), (0,255,0),2)
+            # if rects[0][3] < ZOOM_HEIGHT:
+            #     cv.imshow("frame", curr_frame)
+            #     cv.waitKey(0)
+            
             if (rects[0][3] < ZOOM_HEIGHT) and (i_last_large_head < max_frames_large_head):
-                print("curr i: ", i)
-                print("rects: ", rects)
                 right_side_faces = prof_face_cascade.detectMultiScale(gray, 1.1, 4)
                 left_side_faces = prof_face_cascade.detectMultiScale(cv.flip(gray, 1), 1.1, 4)
-                left_side_faces = [[self.shape[2]-curr_rect[0], curr_rect[1], curr_rect[2], curr_rect[3]] for curr_rect in left_side_faces]
-                both_side_faces = list(right_side_faces).extend(list(left_side_faces))
+                left_side_faces = [[self.shape[2]-curr_rect[0]-curr_rect[2], curr_rect[1], curr_rect[2], curr_rect[3]] for curr_rect in left_side_faces]
+                if not list(right_side_faces):
+                    both_side_faces = left_side_faces
+                else:
+                    both_side_faces = left_side_faces.extend([list(elem) for elem in right_side_faces])
                 max_both_rect = self._find_greatest_rect(both_side_faces)
-                print("Both side faces: ", both_side_faces)
-                print("Max both rect: ", max_both_rect)
-                cv.imshow("frame", curr_frame)
-                cv.waitKey(0)
                 if max_both_rect and (max_both_rect[3] > ZOOM_HEIGHT):
                     rects.insert(0, max_both_rect)
                     quant_rect.insert(0, self._rect_func(max_both_rect))
                     cv.rectangle(curr_frame, (max_both_rect[0], max_both_rect[1]),
                                 (max_both_rect[0]+max_both_rect[2], max_both_rect[1]+max_both_rect[3]),
                                 (0,255,0), 2)
+                # cv.imshow("frame", curr_frame)
+                # cv.waitKey(0)
                     
 
             quant_rect_tot.append(quant_rect)
@@ -225,7 +234,7 @@ def main():
 def main_test():
     vid_dir = os.getcwd() + "/test_data/test2.mp4"
     anon = Anon(vid_dir)
-    print("rect overlap: ", anon._rect_compare([[0, 20, 10, 10], [9, 30, 20, 20], [30, 30, 1, 1]]))
+    print("greatest rect: ", anon._find_greatest_rect([[0, 20, 10, 10], [9, 30, 20, 20], [30, 30, 1, 1]]))
 
 
 if __name__ == "__main__":
