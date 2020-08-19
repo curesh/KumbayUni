@@ -21,6 +21,6 @@ Features:
 
 
 Urgent Todo:
-1. Do some sort of analysis on plot of large rects at end, to fill in the gaps, where it misses detecting the
-large rectangle
+1. Run the smoothing algorithm multiple times so every size box gets smoothed
 2. Make it faster
+3. Comment and clean up
