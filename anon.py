@@ -12,7 +12,18 @@ ZOOM_HEIGHT = 138
 class Anon():
 
     # Initialize instance variables
-    def __init__(self, vid_dir):
+    def __init__(self, vid_dir=None):
+        if vid_dir == None:
+            print("Test_main Activated")
+            self.vid = None
+            self.scale = 1
+            self.frames = []
+            self.frames_step = []
+            self.shape = [1,1,1]
+            self.shape_step = [1,1,1]
+            self.scale_frame = 1
+            self.fps = 1
+            return None
         print("Constructing")
         vid = cv.VideoCapture(vid_dir)
         self.vid = vid
@@ -29,7 +40,7 @@ class Anon():
                 frames.append(frame)
             else:
                 break
-        self.frames = frames[:400]
+        self.frames = frames[:350]
         scale = 1
         if len(self.frames) > 1000:
             scale = int(len(self.frames)/1000)
@@ -39,51 +50,15 @@ class Anon():
         self.shape_step = np.shape(self.frames_step)
         self.scale_frame = scale
         self.fps = vid.get(cv.CAP_PROP_FPS)
-
-        
         print("Done constructing")
     def __del__(self):
         print("Destructing")
-        self.vid.release()
+        if self.vid is not None:
+            self.vid.release()
         
     # Preprocess the video (get frames, etc.)
     def _preprocess(self):
         pass
-    
-    # Check if two rectangles are overlapping
-    def _rect_overlap(self, rect, other_rect):
-        # If one rectangle is on left side of other 
-        if(rect[0] >= other_rect[2]+other_rect[0] or other_rect[0] >= rect[2]+rect[0]):
-            return False
-    
-        # If one rectangle is above other 
-        if(rect[1] >= other_rect[3]+other_rect[1] or other_rect[1] >= rect[3]+rect[1]): 
-            return False
-    
-        return True
-    
-    # Given an array of rectangles, return a new array of rectangles, with only those that are non overlapping
-    # Given an three arrays of rectangles, return only
-    def _rect_compare(self, all_rects):
-        # all_rects_len = [len(rects1), len(rects2), len(rects3)]
-        # all_rects = [rects1, rects2, rects3]
-        # ind_sort = np.argsort(all_rects_len)[::-1]
-        # all_rects = [all_rects[index] for index in ind_sort]
-        
-        non_overlap = []
-        # overlapped = True
-        # # for i in range(max(len(rects1), len(rects2), len(rects3))):
-        # #     if i < len(all_rects[1]):
-
-        # while overlapped:
-        #     for rect in non_overlap:
-        #         if self._rect_overlap(all_rects[i], all_rects[j]):
-        #             if all_rects[i][2]*all_rects[i][3] >= all_rects[j][2]*all_rects[j][3]:
-        #                  non_overlap.append(all_rects[i])
-        #             else:
-        #                  non_overlap.append(all_rects[j])
-                    #  non_overlap.append()
-        return  non_overlap
     
     # This function is used for quantizing a rectangle for the purposes of generating the graph over time
     def _rect_func(self, rect):
@@ -138,7 +113,9 @@ class Anon():
         quant_rect_tot = []
         rects_tot = []
         i_last_large_head = 0
-        max_frames_large_head = int(8*self.fps/self.scale_frame)
+        
+        # The 4 here is the number of seconds that it will check profile faces for (since detecting the last large face)
+        max_frames_large_head = int(4*self.fps/self.scale_frame)
         prof_face_cascade = cv.CascadeClassifier('/System/Volumes/Data/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/cv2/data/haarcascade_profileface.xml')
         face_cascade = cv.CascadeClassifier('./haarcascade_frontalface_default.xml')
 
@@ -203,14 +180,88 @@ class Anon():
             i_last_large_head += 1
             
         return quant_rect_tot, rects_tot
-        
+    
     # Static face anonymization
     def anon_static(self):
         # print("self.frames: ", self.frames)
         quant_rect_tot, rects_tot = self._find_zoom()
+        # print("rects_tot: ", rects_tot)
+        # print("quants rect tot: ", quant_rect_tot)
         first_elem_quant_rect = [vec[0] for vec in quant_rect_tot]
-        plt.plot(first_elem_quant_rect)
+        plt.plot(first_elem_quant_rect, color='b')
+        quant_rect_tot, rects_tot = self.smooth_largest(rects_tot, quant_rect_tot, 1, 4)
+        first_elem_quant_rect = [vec[0] for vec in quant_rect_tot]
+        plt.plot(first_elem_quant_rect, color='r')
         plt.show()
+
+    # Return the area of overlapped region for two rectangles
+    # If they don't overlap, return -1
+    def _overlap_area(self, rect, other_rect):
+        width = min(rect[0]+rect[2],other_rect[0]+other_rect[2])-max(rect[0],other_rect[0])
+        if width <= 0:
+            return -1
+        height = min(rect[1]+rect[3],other_rect[1]+other_rect[3])-max(rect[1],other_rect[1])
+        if height <= 0:
+            return -1    
+        return width*height
+        
+    # For each frame, return a new subset of maximized (by area) rectangles where non overlap
+    def _remove_overlapping(self, rects):
+        quants = []
+        for i, rects_frame in enumerate(rects):
+            
+            # This is the array of rectangles that you need to empty. It is sorted from greatest to least
+            check_rects = rects_frame.copy()
+            nonoverlap_rects = []
+            nonoverlap_quants = []
+            while check_rects:
+                largest_rect = check_rects[0]
+                area_largest = largest_rect[2]*largest_rect[3]
+                good = True
+                for rect in nonoverlap_rects:
+                    # area_rect = rect[2]*rect[3]
+                    overlap = self._overlap_area(rect, largest_rect)
+                    if area_largest < 10*overlap:
+                        # If the overlap is not really small, then consider it an overlap
+                        good = False
+                if good:
+                    nonoverlap_rects.append(largest_rect)
+                    nonoverlap_quants.append(self._rect_func(largest_rect))
+                check_rects.remove(largest_rect)
+            rects[i] = nonoverlap_rects
+            quants.append(nonoverlap_quants)
+            
+        return quants, rects
+    
+    # Smooth out the plot of the largest rectangle areas across all the frames. 
+    # Do this adding a large rectangle to a given frame, if there was x (x may just be 1) large
+    # rectangles at most y seconds ago (y will probably be about 4)
+    def smooth_largest(self, rects, quants, x, y):
+        threshold_frames = int(self.fps*y/self.scale_frame)
+        
+        num_large = 1
+        frames_since_large = 0
+        avg_large_rect = np.array([0,0,0,0])
+        for i in range(len(rects)):
+            if rects[i][0][3] > ZOOM_HEIGHT:
+                if avg_large_rect[2] == 0:
+                    avg_large_rect = rects[i][0].copy()
+                avg_large_rect = np.add(avg_large_rect, rects[i][0])/2
+                num_large += 1
+                frames_since_large = 0
+            elif frames_since_large < threshold_frames and num_large >= x:
+                print("Current avg large rect: ", avg_large_rect)
+                rects[i][0].insert(0, avg_large_rect)
+                quants[i].insert(0, self._rect_func(avg_large_rect))
+                p1 = (int(avg_large_rect[0]), int(avg_large_rect[1]))
+                p2 = (int(avg_large_rect[0]+avg_large_rect[2]), int(avg_large_rect[1]+avg_large_rect[3]))
+                cv.rectangle(self.frames[i], p1, p2, (255,255,0), 2)
+            else:
+                avg_large_rect = [0,0,0,0]
+                num_large = 0
+            frames_since_large += 1
+        return quants, rects
+                
                 
     def play_vid(self, frames):
         print("len frames: ", len(frames))
@@ -233,10 +284,11 @@ def main():
 
 def main_test():
     vid_dir = os.getcwd() + "/test_data/test2.mp4"
-    anon = Anon(vid_dir)
-    print("greatest rect: ", anon._find_greatest_rect([[0, 20, 10, 10], [9, 30, 20, 20], [30, 30, 1, 1]]))
+    anon = Anon()
+    print("greatest rect: ", anon._remove_overlapping([[[0, 20, 10, 10], [9, 30, 20, 20], [20, 30, 1, 1]]]))
+    print("overlap rect: ", anon._overlap_area([9, 30, 20, 20], [30, 30, 1, 1]))
 
 
 if __name__ == "__main__":
-    main()
+    main_test()
     
