@@ -4,6 +4,7 @@ import os
 import sys
 import matplotlib.pyplot as plt
 
+# Global Constants
 ZOOM_WIDTH = 244
 ZOOM_HEIGHT = 138
 
@@ -11,6 +12,8 @@ class Anon():
 
     # Initialize instance variables
     def __init__(self, vid_dir=None):
+
+        # Alternate "Constructor" used for testing
         if vid_dir == None:
             print("Test_main Activated")
             self.vid = None
@@ -24,9 +27,12 @@ class Anon():
             return None
         
         print("Constructing")
+        # Initialize video capture
         vid = cv.VideoCapture(vid_dir)
         self.vid = vid
         frames = []
+
+        # Collect the frames for the 
         while vid.isOpened():
             ret, frame = vid.read()
             if ret:
