@@ -6,3 +6,11 @@ CREATE TABLE links (
     title TEXT NOT NULL,
     link_hash TEXT NOT NULL
 );
+
+DROP TABLE IF EXISTS lectures;
+
+CREATE TABLE lectures (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    file_name TEXT NOT NULL,
+);

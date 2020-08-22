@@ -1,3 +1,8 @@
+# anon.py by Chandra Suresh
+
+# Ideas that need implementing
+# 1. Check if its a real world image or a screenrecording by doing some stastics on curr_frame, or maybe some machine learning model
+
 import cv2 as cv
 import numpy as np
 import os
@@ -5,9 +10,12 @@ import sys
 import matplotlib.pyplot as plt
 
 # Global Constants
+
+# The dimensions for a zoom box are constant regardless of screen resolution in screen recordings
 ZOOM_WIDTH = 244
 ZOOM_HEIGHT = 138
 
+# Class used for storing the video frames, and relavent metadata
 class Anon():
 
     # Initialize instance variables
@@ -36,6 +44,7 @@ class Anon():
         while vid.isOpened():
             ret, frame = vid.read()
             if ret:
+                # Downsample the video if the resolution is too high, to save space
                 self.scale=1
                 if frame.shape[0] > 1000 or frame.shape[1] > 1000:
                     self.scale = 1000/max(frame.shape[0], frame.shape[1])
@@ -47,19 +56,24 @@ class Anon():
                 break
         self.frames = frames
         scale = 1
-        if len(self.frames) > 1000:
-            scale = int(len(self.frames)/1000)
+
+        # Perform analysis on a lower number of frames, then interpolate in post-processing
+        if len(self.frames) > 2000:
+            scale = int(len(self.frames)/2000)
+
+        # Store various metadata
         self.frames_step = self.frames[::scale]
         self.shape = np.shape(self.frames)
         print("Shape: ", self.shape)
         self.shape_step = np.shape(self.frames_step)
         self.scale_frame = scale
         self.fps = vid.get(cv.CAP_PROP_FPS)
-    
         self.standard_rect = [int(self.shape[2]/3), int(self.shape[1]/3),
                               int(self.shape[2]/3), int(self.shape[1]/3)]
-        print("Standard rect: ", self.standard_rect)
+
         print("Done constructing")
+
+    # Destructor
     def __del__(self):
         print("Destructing")
         if self.vid is not None:
@@ -69,29 +83,25 @@ class Anon():
     def _preprocess(self):
         pass
     
-    # This function is used for quantizing a rectangle for the purposes of generating the graph over time
+    # This function is used for quantizing a rectangle for the purposes of generating the graph over time of the size of the rectangles
     def _rect_func(self, rect):
-        alpha = 0.1
-        beta = 1-alpha
-        
         rect  = [rect[0]/self.shape[2], rect[1]/self.shape[1], rect[2]/self.shape[2], rect[3]/self.shape[1]]
-        
-        # rect_val = alpha*(rect[0] + rect[1])/2
-        # rect_val += beta*(rect[2]*rect[3])
-        
         rect_val = (rect[2]+rect[3])/2
         return rect_val
     
-    # Orders rectangle array by rects from largest to smallest
+    # Find greatest recangle in an array of rectangle (greatest is defined by _rect_func(...))
     def _find_greatest_rect(self, rects):
         if not rects:
             return None
+
         ans = rects[0]
+        
         for rect in rects:
             if self._rect_func(rect) > self._rect_func(ans):
                 ans = rect
         return ans
-        
+
+    # Orders array of rectangles of greatest to least (as determined by _rect_func), and returns their quantized values
     def _order_rects(self, rects, quants=None):
         if rects is None:
             return [[0,0,0,0]], [0]
@@ -103,36 +113,30 @@ class Anon():
         rects = [rects[index] for index in ind_sort]
         quants.sort(reverse=True)
         return rects, quants
-    
-    # Additional feature you want to add, is that if a large frontal box isn't there for a given, frame 
-    # (yet, there was a frontal box within the last 8 seconds, it should check either profile)
-    
-    # Test cases not handled yet
-    # 1. At a single frame, there is no face detected
-    # 2. At a single frame there are multiple true faces detected
-    # 3. At a single frame, there are multiple true and some false faces detected
-    
-    # Ideas that need implementing
-    # 1. Check if its a real world image or a screenrecording by doing some stastics on curr_frame, or maybe some machine learning model
-    
+
+    # Function used to find the rectangles bordering faces in an image, using facial recognition
+    # Returns an array of an array of rectangles per frame. Also returns another array (of the same shape)
+    # with the corresponding quantizations
     def _find_zoom(self):
-        #  curr_frame = self.frames[int(self.shape[0]*0.78)]
         area_zoom = ZOOM_HEIGHT*ZOOM_WIDTH*(self.scale**2)
-        
         quant_rect_tot = []
         rects_tot = []
         i_last_large_head = 0
         
         # The 4 here is the number of seconds that it will check profile faces for (since detecting the last large face)
         max_frames_large_head = int(4*self.fps/self.scale_frame)
-        prof_face_cascade = cv.CascadeClassifier('/System/Volumes/Data/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/cv2/data/haarcascade_profileface.xml')
-        face_cascade = cv.CascadeClassifier('./haarcascade_frontalface_default.xml')
 
+        # Load the face classifer
+        prof_face_cascade = cv.CascadeClassifier('/System/Volumes/Data/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/cv2/data/haarcascade_profileface.xml')
+        face_cascade = cv.CascadeClassifier('./assets/haarfiles/haarcascade_frontalface_default.xml')
+
+        # For every frame in the sampled video, detect frontal faces (and sometimes profile faces depending on certain parameters)
         for i,  curr_frame in enumerate(self.frames_step):
             if i%50 == 0:
                 print("i: ", i)     
             
             gray = cv.cvtColor(curr_frame, cv.COLOR_BGR2GRAY)
+            
             # prof_face_cascade = cv.CascadeClassifier('./lbpcascade_profileface.xml')
             # detectMultiScale(...) Params:
             # Image---
@@ -143,18 +147,25 @@ class Anon():
             # minNeighbors--- Higher value results in less detections but with higher quality.
             # 3~6 is a good value for it.
             front_faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+            
             rects, quant_rect = self._order_rects(list(front_faces))
+            
             if not rects:
                 rects = [[0,0,0,0]]
                 quant_rect = [0]
             
             if rects[0][3] > ZOOM_HEIGHT:
                 i_last_large_head = 0
-            
+
+            # If there has been a large face detected "recently" (as defined earlier) and there
+            # is no large face now, run face detection for profile faces as well
             if (rects[0][3] < ZOOM_HEIGHT) and (i_last_large_head < max_frames_large_head):
                 right_side_faces = prof_face_cascade.detectMultiScale(gray, 1.1, 4)
                 left_side_faces = prof_face_cascade.detectMultiScale(cv.flip(gray, 1), 1.1, 4)
+
+                # Since the face detection is built for right side_faces, we need to flip back the flipped rectangles that were created
                 left_side_faces = [[self.shape[2]-curr_rect[0]-curr_rect[2], curr_rect[1], curr_rect[2], curr_rect[3]] for curr_rect in left_side_faces]
+                
                 if not list(right_side_faces):
                     both_side_faces = left_side_faces
                 else:
@@ -164,31 +175,31 @@ class Anon():
                     rects.insert(0, max_both_rect)
                     quant_rect.insert(0, self._rect_func(max_both_rect))
 
+            # Add current frame's rectangles and quants to the main list
             quant_rect_tot.append(quant_rect)
             rects_tot.append(rects)
             i_last_large_head += 1
             
         return quant_rect_tot, rects_tot
-    
+
+    # Draw all the rectangles in the list to the corresping frames in the original array of frames
     def _draw_rects(self, rects):
         for i, rects_frame in enumerate(rects):
             for rect in rects_frame:
-                if rect[2] == 0:
-                    rects[i].remove(rect)
-                    continue
-                p1 = (int(max(0,rect[0]-0.25*rect[2])), int(max(0,rect[1]-0.25*rect[3])))
-                p2 = (int(min(self.shape[2],rect[0]+1.25*rect[2])), int(min(self.shape[1],rect[1]+1.25*rect[3])))
-                cv.rectangle(self.frames[i], p1, p2, (255, 255, 0), 4)
-                # print("rect for subface: ", rect)
-                # print("p1 and p2: ", p1, ", ", p2)
-                sub_face = self.frames[i][p1[1]:min(p2[1],self.shape[1]),p1[0]:min(p2[0], self.shape[2])]
-                # apply a gaussian blur on this new recangle image
-                sub_face = cv.GaussianBlur(sub_face, (171, 171), 60)
-                # merge this blurry rectangle to our final image
-                self.frames[i][p1[1]:min(p2[1],self.shape[1]),p1[0]:min(p2[0], self.shape[2])] = sub_face
+                for j in range(i*self.scale_frame,(i+1)*self.scale_frame)
+                    if rect[2] == 0:
+                        rects[i].remove(rect)
+                        continue
+
+                    p1 = (int(max(0,rect[0]-0.25*rect[2])), int(max(0,rect[1]-0.25*rect[3])))
+                    p2 = (int(min(self.shape[2],rect[0]+1.25*rect[2])), int(min(self.shape[1],rect[1]+1.25*rect[3])))
+                    cv.rectangle(self.frames[j], p1, p2, (255, 255, 0), 4)
+                    sub_face = self.frames[j][p1[1]:min(p2[1],self.shape[1]),p1[0]:min(p2[0], self.shape[2])]
+                    sub_face = cv.GaussianBlur(sub_face, (171, 171), 60)
+                    self.frames[j][p1[1]:min(p2[1],self.shape[1]),p1[0]:min(p2[0], self.shape[2])] = sub_face
         
     # Smooth out the plot of the largest rectangle areas across all the frames. 
-    # Do this adding a large rectangle to a given frame, if there was x (x may just be 1) large
+    # Do this adding a large rectangle to a given frame, if there were x (x may just be 1) large
     # rectangles at most y seconds ago (y will probably be about 4)
     def smooth_largest(self, rects, quants, x, y):
         threshold_frames = int(self.fps*y/self.scale_frame)
@@ -197,15 +208,19 @@ class Anon():
         frames_since_large = 0
         avg_large_rect = np.array([0,0,0,0])
         for i in range(len(rects)):
-            # NOTE:This 0.8 here is an important paramenter and should be supplied from elsewhere
+
+            # If this rectangle is large, then note that, and add it to the running average of large
+            # rectangles
+            # NOTE: The 0.8 here is an important parameter and should be supplied from elsewhere
             if rects[i][0][3] > max(int(avg_large_rect[3]*0.8),ZOOM_HEIGHT):
                 if avg_large_rect[2] == 0:
                     avg_large_rect = rects[i][0].copy()
                 avg_large_rect = np.add(avg_large_rect, rects[i][0])/2
                 num_large += 1
                 frames_since_large = 0
+
+            # If this isn't a large rectangle, but there has been one recently, apply the smoothing
             elif frames_since_large < threshold_frames and num_large >= x:
-                # print("Current avg large rect: ", avg_large_rect)
                 if avg_large_rect[2] != 0:
                     insert_rect = [avg_large_rect[0]-frames_since_large, avg_large_rect[1]-frames_since_large, avg_large_rect[2]+frames_since_large, avg_large_rect[3]+frames_since_large]
                     rects[i].insert(0, insert_rect)
@@ -214,27 +229,31 @@ class Anon():
                     rects[i].insert(0, self.standard_rect)
                     quants[i].insert(0, self._rect_func(self.standard_rect))
                     rects[i], quants[i] = self._order_rects(rects[i])
-                # cv.rectangle(self.frames[i], p1, p2, (255,255,0), 2)
+
+            # Otherwise, keep the marked rectangle as is
             else:
                 avg_large_rect = [0,0,0,0]
                 num_large = 0
+                
             frames_since_large += 1
         return quants, rects
     
-    # Static face anonymization
+    # Overarching anonymization function
     def anon_static(self):
-        # print("self.frames: ", self.frames)
         quant_rect_tot, rects_tot = self._find_zoom()
-        # print("rects_tot: ", rects_tot)
-        # print("quants rect tot: ", quant_rect_tot)
         first_elem_quant_rect = [vec[0] for vec in quant_rect_tot]
+
+        # This plots the quantizations of the rectangles, before smoothign
         plt.figure()
         plt.plot(first_elem_quant_rect, color='b')
+
         quant_rect_tot, rects_tot = self.smooth_largest(rects_tot, quant_rect_tot, 1, 4)
         quant_rect_tot, rects_tot = self._remove_overlapping(rects_tot)
-        # print("rects after remove overlapping: ", rects_tot)
+
         self._draw_rects(rects_tot)
         first_elem_quant_rect = [vec[0] for vec in quant_rect_tot]
+
+        # This plots the quantization of the rectangles after smoothing
         plt.figure()
         plt.plot(first_elem_quant_rect, color='r')
         plt.show()
@@ -250,7 +269,7 @@ class Anon():
             return -1    
         return width*height
         
-    # For each frame, return a new subset of maximized (by area) rectangles where non overlap
+    # For each frame, return a new subset of maximized (by area) rectangles where none  overlap
     def _remove_overlapping(self, rects):
         quants = []
         for i, rects_frame in enumerate(rects):
@@ -259,15 +278,17 @@ class Anon():
             check_rects = rects_frame.copy()
             nonoverlap_rects = []
             nonoverlap_quants = []
+            
             while check_rects:
                 largest_rect = check_rects[0]
                 area_largest = largest_rect[2]*largest_rect[3]
+
+                # True if not overlapping
                 good = True
                 for rect in nonoverlap_rects:
-                    # area_rect = rect[2]*rect[3]
                     overlap = self._overlap_area(rect, largest_rect)
+                    # If the overlap is not really small, then consider it an overlap
                     if area_largest < 10*overlap or area_largest == 0:
-                        # If the overlap is not really small, then consider it an overlap
                         good = False
                         break
                 if good:
@@ -275,24 +296,28 @@ class Anon():
                     nonoverlap_quants.append(self._rect_func(largest_rect))
                 check_rects.remove(largest_rect)
             rects[i] = nonoverlap_rects
-            quants.append(nonoverlap_quants)
-            
+            quants.append(nonoverlap_quants)            
         return quants, rects
     
-
-                
-                
+    # This function plays a video given an array of frames
     def play_vid(self, frames):
-        print("len frames: ", len(frames))
+        print("Len Frames: ", len(frames))
         cv.imshow("frame", frames[0])
         cv.waitKey(0)
         for frame in frames :
             cv.imshow('frame', frame)
             if cv.waitKey(4) & 0xFF == ord('q'):
                 break
-
+            
+    # This function saves its own frames (WIP)
+    def save_vid(self):
+        result = cv.VideoWriter('test1_processed.avi',  
+                         cv.VideoWriter_fourcc(*'MJPG'), 
+                         10, (self.shape[2], self.shape[1]))
+        
+# Driver function
 def main():
-    vid_dir = os.getcwd() + "/test_data/test1.mp4"
+    vid_dir = os.getcwd() + "/assets/test_data/vids/test1.mp4"
     anon = Anon(vid_dir)
     anon.anon_static()
     for i in range(20):
@@ -301,13 +326,12 @@ def main():
     print("Shape frames:", np.shape(anon.frames))
     print("One frame shape: ", np.shape(anon.frames[0]))
 
+# Driver function used for testing and debugging
 def main_test():
-    vid_dir = os.getcwd() + "/test_data/test1.mp4"
+    vid_dir = os.getcwd() + "/assets/test_data/vids/test1.mp4"
     anon = Anon()
     print("greatest rect: ", anon._remove_overlapping([[[0, 20, 10, 10], [9, 30, 20, 20], [20, 30, 1, 1]]]))
     print("overlap rect: ", anon._overlap_area([9, 30, 20, 20], [30, 30, 1, 1]))
 
-
 if __name__ == "__main__":
     main()
-    
