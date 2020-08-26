@@ -11,16 +11,19 @@
 
 3. Figure out what you need to do to get the preliminary backend working
 
+4. For now, you just want a video uploading pipeline
 
 Features:
 1. A textbox that allows people to submit time points in the video that need to be blacked out or something
 2. Anonymization
 3. Tree Structure
 4. Search box for finding video
-5. Upload Video
+5. Make account (to upload not view)
+6. Upload video (it gets processed automatically and the anonymized version is uploaded)
+   a. First step would be to 
 
 
 Urgent Todo:
-1. Run the smoothing algorithm multiple times so every size box gets smoothed
+1. Web dev
 2. Make it faster
 3. Comment and clean up
