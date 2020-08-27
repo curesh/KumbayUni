@@ -23,7 +23,9 @@ Features:
    a. First step would be to 
 
 
-Urgent Todo:
-1. Web dev
-2. Make it faster
-3. Comment and clean up
+Urgent Todo for tmrw:
+1. Try to get login auth (and config.py) working using this website: https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-iii-web-forms
+2. Try to get sql alchemy working using https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-iv-database
+3. Try to get redis background jobs working using https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-xxii-background-jobs
+4. Try to get processed video displaying on the website after upload using the flask youtube video you were watching and other resources
+5. TBD

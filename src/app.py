@@ -3,6 +3,10 @@ from flask import Flask, render_template, request, url_for, flash, redirect
 from werkzeug.exceptions import abort
 from werkzeug.utils import secure_filename
 import os
+from forms import LoginForm
+from config import Config
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 
 def get_db_connection():
     conn = sqlite3.connect('database/database.db')
@@ -10,8 +14,18 @@ def get_db_connection():
     return conn
 
 app = Flask(__name__)
-#app.run(host=HOST, port=PORT, threaded=True)
-app.config['SECRET_KEY'] = 'fjdalfiipyujsal7f34ks7a13lfnfa441ksivnor231'
+app.config.from_object(Config)
+#app.config['SECRET_KEY'] = 'fjdalfiipyujsal7f34ks7a13lfnfa441ksivnor231'
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    form = LoginForm()
+    if form.validate_on_submit():
+        flash('Login requested for user {}, remember_me={}'.format(
+            form.username.data, form.remember_me.data))
+        return redirect(url_for('index'))
+    
+    return render_template('login.html', title='Sign In', form=form)
 
 @app.route('/')
 def index():
