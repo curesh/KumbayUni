@@ -7,12 +7,17 @@ with open('./schema.sql') as f:
     connection.executescript(f.read())
     
 cur = connection.cursor()
-cur.execute("INSERT INTO links (title, link_hash) VALUES (?, ?)",
-            ('Physics MIT  Lecture 1', 'wWnfJ0-xXRE')
+
+cur.execute("INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
+            ('chandra', 'chandra.b.suresh@gmail.com', 'abc')
             )
 
-cur.execute("INSERT INTO links (title, link_hash) VALUES (?, ?)",
-            ('Physics MIT Lecture 2', 'GtOGurrUPmQ')
+cur.execute("INSERT INTO links (title, link_hash, user_id) VALUES (?, ?, ?)",
+            ('Physics MIT  Lecture 1', 'wWnfJ0-xXRE', 1)
+            )
+
+cur.execute("INSERT INTO links (title, link_hash, user_id) VALUES (?, ?, ?)",
+            ('Physics MIT Lecture 2', 'GtOGurrUPmQ', 1)
             )
 
 cur.execute("INSERT INTO lectures (file_name) VALUES (?)",

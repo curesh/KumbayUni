@@ -2,6 +2,7 @@
 
 {% block content %}
     <h1>{% block title %} Welcome to KumbayUni {% endblock %}</h1>
+    <h1>Hi, {{ current_user.username }}!</h1>
     <iframe src="https://www.youtube.com/embed/YQHsXMglC9A" width="853" height="480" frameborder="0" allowfullscreen></iframe>
     {% for link in links %}
         <a href="{{ url_for('link', link_id=link['id']) }}">

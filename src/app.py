@@ -7,25 +7,46 @@ from forms import LoginForm
 from config import Config
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_login import LoginManager, current_user, login_user
+from models import User, load_user
+from flask_login import logout_user
+from werkzeug.urls import url_parse
+
+app = Flask(__name__)
+app.config.from_object(Config)
+login = LoginManager(app)
+login.login_view = 'login'
 
 def get_db_connection():
     conn = sqlite3.connect('database/database.db')
     conn.row_factory = sqlite3.Row
     return conn
 
-app = Flask(__name__)
-app.config.from_object(Config)
-#app.config['SECRET_KEY'] = 'fjdalfiipyujsal7f34ks7a13lfnfa441ksivnor231'
-
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
     form = LoginForm()
     if form.validate_on_submit():
-        flash('Login requested for user {}, remember_me={}'.format(
-            form.username.data, form.remember_me.data))
+        conn = get_db_connection()
+        uid = conn.execute("SELECT user_id from users where username = (?)", [username])
+        user = load_user(uid)
+        if not user or not user.check_password_hash(form.password.data):
+            flash('Invalid username or password')
+            return redirect(url_for('login'))
+        login_user(user, remember=form.remember_me.data)
+        next_page = request.args.get('next')
+        if not next_page or url_parse(next_page).netloc != '':
+            next_page = url_for('index')
         return redirect(url_for('index'))
     
     return render_template('login.html', title='Sign In', form=form)
+
+@app.route('/logout')
+def logout():
+    logout_user()
+    return redirect(url_for('index'))
 
 @app.route('/')
 def index():
@@ -36,7 +57,7 @@ def index():
 
 def get_link(link_id):
     conn = get_db_connection()
-    link = conn.execute('SELECT * FROM links WHERE id = ?',
+    link = conn.execute('SELECT * FROM links WHERE link_id = ?',
                         (link_id,)).fetchone()
     conn.close()
     if link is None:
@@ -65,6 +86,7 @@ def allowed_images(filename):
         return False
 
 @app.route('/create', methods=('GET', 'POST'))
+@login_required
 def create():
     if request.method == 'POST':
         f = request.files['file']
