@@ -1,27 +1,56 @@
-import sqlite3
 from flask import Flask, render_template, request, url_for, flash, redirect
 from werkzeug.exceptions import abort
 from werkzeug.utils import secure_filename
 import os
-from forms import LoginForm
+from forms import LoginForm, RegistrationForm
 from config import Config
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_login import LoginManager, current_user, login_user
-from models import User, load_user
-from flask_login import logout_user
+from flask_login import LoginManager, current_user, login_user, logout_user, UserMixin, login_required
 from werkzeug.urls import url_parse
+from models import get_db_connection, User
+
+# class User(UserMixin):
+#     def __init__(self, user_id, name, email, password, active = True):
+#         self.id = user_id
+#         self.name = name
+#         self.email = email
+#         self.password_hash = password
+#         self.active = active
+
+#     def set_password(self, password):
+#         self.password_hash = generate_password_hash(password)
+
+#     def check_password(self, password):
+#         return check_password_hash(self.password_hash, password)
 
 app = Flask(__name__)
 app.config.from_object(Config)
+
 login = LoginManager(app)
 login.login_view = 'login'
 
-def get_db_connection():
-    conn = sqlite3.connect('database/database.db')
-    conn.row_factory = sqlite3.Row
-    return conn
+@login.user_loader
+def load_user(user_id):
+    if not user_id:
+        return None
+    conn = get_db_connection()
+    print("user_id in load_user: ", user_id)
+    c = conn.execute("SELECT * from users where user_id = (?)", [int(user_id),])
+
+    userrow = c.fetchone()
+    conn.close()
+    userid = userrow[0] # or whatever the index position is
+    print("userid in load_user: ", userid, ", ", userrow[1])
+    if not userid:
+        return None
+    u = User(userid, userrow[1], userrow[2], userrow[3])
+    if u:
+        print("hashing pwd: ", userrow[3])
+        u.set_password(u.password_hash)
+        print("dehash pwd bool: ", u.check_password(userrow[3]))
+    return u
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -30,9 +59,17 @@ def login():
     form = LoginForm()
     if form.validate_on_submit():
         conn = get_db_connection()
-        uid = conn.execute("SELECT user_id from users where username = (?)", [username])
+        uid = conn.execute("SELECT user_id FROM users WHERE username = (?)", [form.username.data,]).fetchone()
+        conn.close()
+        if uid:
+            uid = uid[0]
+        print("uid: ", uid)
         user = load_user(uid)
-        if not user or not user.check_password_hash(form.password.data):
+        print("user: ", user)
+        if user:
+            print("user.password: ", user.password_hash)
+        
+        if not user or not user.check_password(form.password.data):
             flash('Invalid username or password')
             return redirect(url_for('login'))
         login_user(user, remember=form.remember_me.data)
@@ -47,6 +84,22 @@ def login():
 def logout():
     logout_user()
     return redirect(url_for('index'))
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    form = RegistrationForm()
+    if form.validate_on_submit():
+        conn = get_db_connection()
+        conn.execute("INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
+                     (form.username.data, form.email.data, form.password.data)
+                     )
+        conn.commit()
+        conn.close()
+        flash('Congratulations, you are now a registered user!')
+        return redirect(url_for('login'))
+    return render_template('register.html', title='Register', form=form)
 
 @app.route('/')
 def index():
