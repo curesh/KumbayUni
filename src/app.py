@@ -11,20 +11,6 @@ from flask_login import LoginManager, current_user, login_user, logout_user, Use
 from werkzeug.urls import url_parse
 from models import get_db_connection, User
 
-# class User(UserMixin):
-#     def __init__(self, user_id, name, email, password, active = True):
-#         self.id = user_id
-#         self.name = name
-#         self.email = email
-#         self.password_hash = password
-#         self.active = active
-
-#     def set_password(self, password):
-#         self.password_hash = generate_password_hash(password)
-
-#     def check_password(self, password):
-#         return check_password_hash(self.password_hash, password)
-
 app = Flask(__name__)
 app.config.from_object(Config)
 
@@ -122,7 +108,7 @@ def link(link_id):
     link = get_link(link_id)
     return render_template('link.html', link=link)
 
-app.config['UPLOAD_FOLDER'] = "/Users/bigboi01/Documents/CSProjects/kumbayuni/assets/test_data/vids"
+app.config['UPLOAD_FOLDER'] = "/Users/bigboi01/Documents/CSProjects/kumbayuni/assets/test_data/vids/original"
 # Maximum upload size is 100 mB
 app.config['MAX_CONTENT_PATH'] = 100000000
 app.config['ALLOWED_VID_EXTENSIONS'] = ["MP4", "MKV", "MOV", "WMV", "AVI"]
@@ -143,12 +129,9 @@ def allowed_images(filename):
 def create():
     if request.method == 'POST':
         f = request.files['file']
-
         print("f ", f)
-
         if not f:
             flash('File is required')
-
         title = request.form['title']
         full_file = os.path.join(app.config['UPLOAD_FOLDER'],secure_filename(f.filename)) 
         if not title:
