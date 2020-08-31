@@ -310,10 +310,13 @@ class Anon():
                 break
             
     # This function saves its own frames (WIP)
-    def save_vid(self):
-        result = cv.VideoWriter('test1_processed.avi',  
+    def save_vid(self, save_path):
+        result = cv.VideoWriter(save_path,  
                          cv.VideoWriter_fourcc(*'MJPG'), 
                          10, (self.shape[2], self.shape[1]))
+        for frame in self.frames:
+            result.write(frame)
+        result.release() 
         
 # Driver function
 def main():

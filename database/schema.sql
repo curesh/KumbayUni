@@ -10,9 +10,9 @@ CREATE TABLE links (
     link_hash TEXT NOT NULL,
     user_id INTEGER NOT NULL,
     FOREIGN KEY (user_id)
-       REFERENCES users (user_id) 
-         ON DELETE CASCADE 
-         ON UPDATE NO ACTION
+    	REFERENCES users (user_id) 
+    	    ON DELETE CASCADE 
+            ON UPDATE NO ACTION
 );
 
 CREATE TABLE lectures (
@@ -28,11 +28,16 @@ CREATE TABLE users (
     password_hash TEXT NOT NULL
 );
 
-/*
+
 CREATE TABLE tasks (
     task_id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    description TEXT,
-    user_id INTEGER 
+    name TEXT NOT NULL UNIQUE,
+    description TEXT NOT NULL,
+    complete INTEGER,
+    user_id INTEGER NOT NULL,
+    FOREIGN KEY (user_id)
+    	REFERENCES users (user_id)
+  	    ON DELETE CASCADE
+	    ON UPDATE NO ACTION
 );
-*/
+

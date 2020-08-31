@@ -10,9 +10,19 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import LoginManager, current_user, login_user, logout_user, UserMixin, login_required
 from werkzeug.urls import url_parse
 from models import get_db_connection, User
+from redis import Redis
+import rq
+import os
 
-app = Flask(__name__)
-app.config.from_object(Config)
+# _________INIT___________
+def create_app(config_class=Config):
+    app = Flask(__name__)
+    app.config.from_object(config_class)
+    app.redis = Redis.from_url(app.config['REDIS_URL'])
+    app.task_queue = rq.Queue('src-tasks', connection=app.redis)
+    return app
+
+app = create_app(Config)
 
 login = LoginManager(app)
 login.login_view = 'login'
@@ -23,10 +33,12 @@ def load_user(user_id):
         return None
     conn = get_db_connection()
     print("user_id in load_user: ", user_id)
-    c = conn.execute("SELECT * from users where user_id = (?)", [int(user_id),])
+    c = conn.execute("SELECT * FROM users WHERE user_id = (?)", [int(user_id),])
 
     userrow = c.fetchone()
     conn.close()
+    if userrow is None:
+        return None
     userid = userrow[0] # or whatever the index position is
     print("userid in load_user: ", userid, ", ", userrow[1])
     if not userid:
@@ -108,7 +120,7 @@ def link(link_id):
     link = get_link(link_id)
     return render_template('link.html', link=link)
 
-app.config['UPLOAD_FOLDER'] = "/Users/bigboi01/Documents/CSProjects/kumbayuni/assets/test_data/vids/original"
+app.config['UPLOAD_FOLDER'] = "/Users/bigboi01/Documents/CSProjects/kumbayuni/assets/test_data/vids"
 # Maximum upload size is 100 mB
 app.config['MAX_CONTENT_PATH'] = 100000000
 app.config['ALLOWED_VID_EXTENSIONS'] = ["MP4", "MKV", "MOV", "WMV", "AVI"]
@@ -123,7 +135,7 @@ def allowed_images(filename):
         return True
     else:
         return False
-
+    
 @app.route('/create', methods=('GET', 'POST'))
 @login_required
 def create():
@@ -133,21 +145,42 @@ def create():
         if not f:
             flash('File is required')
         title = request.form['title']
-        full_file = os.path.join(app.config['UPLOAD_FOLDER'],secure_filename(f.filename)) 
+        load_file = os.path.join(app.config['UPLOAD_FOLDER'], "original")
+        save_file = os.path.join(app.config['UPLOAD_FOLDER'], "processed", secure_filename(f.filename))
+        print("filename: ", f.filename)
         if not title:
             flash('Title is required!')
         elif f.filename == "":
             flash('Video must have filename')
         elif not allowed_images(f.filename):
             flash('That video extension is not allowed')
-        elif os.stat(full_file).st_size > app.config['MAX_CONTENT_PATH']:
+        elif os.stat(load_file).st_size > app.config['MAX_CONTENT_PATH']:
             flash('Video is too large. Please, split into two videos.')
         else:
-            f.save(full_file)
-            conn = get_db_connection()
-            conn.execute('INSERT INTO lectures (file_name) VALUES (?)',
-                         (f.filename,))
-            conn.commit()
-            conn.close()
+            curr_path = os.getcwd()
+            os.chdir(load_file)
+            f.save(secure_filename(f.filename))
+            os.chdir(curr_path)
+            print("File uploaded succesfully")
+            load_file = os.path.join(load_file, secure_filename(f.filename))
+            try:
+                conn = get_db_connection()
+                conn.execute('INSERT INTO lectures (file_name) VALUES (?)',
+                             (f.filename,))
+                conn.commit()
+                conn.close()
+            except:
+                print("Error in inserting lecture into database. That lecture is already there (UNIQUE failed). -CS")
+                
+            if current_user.get_task_in_progress('anon_vid'):
+                flash(_('A video is already being uploaded and anonymized'))
+            else:
+                current_user.launch_task('anonymize_video', 'Uploading video...', load_file, save_file)
+
             return redirect(url_for('index'))
     return render_template('create.html')
+
+# @app.route('/anon_vid')
+# @login_required
+# def anon_vid():
+#     return redirect(url_for('index.html'))

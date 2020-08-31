@@ -24,8 +24,10 @@ Features:
 
 
 Urgent Todo for tmrw:
-1. Try to get login auth (and config.py) working using this website: https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-iii-web-forms
-2. Try to get sql alchemy working using https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-iv-database
-3. Try to get redis background jobs working using https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-xxii-background-jobs
-4. Try to get processed video displaying on the website after upload using the flask youtube video you were watching and other resources
-5. TBD
+1. Try to get redis background jobs working using https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-xxii-background-jobs
+2. Try to get processed video displaying on the website after upload using the flask youtube video you were watching and other resources
+3. TBD
+
+Status:
+Currently, there is some problem with the sqlite3 database being locked since there is another different connection already opened or something.
+I don't think there should be though, so I'm trying to track down that open connection
