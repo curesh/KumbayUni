@@ -2,14 +2,13 @@ from flask import Flask, render_template, request, url_for, flash, redirect
 from werkzeug.exceptions import abort
 from werkzeug.utils import secure_filename
 import os
-from forms import LoginForm, RegistrationForm
-from config import Config
+from src.forms import LoginForm, RegistrationForm
+from src.config import Config
 from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import LoginManager, current_user, login_user, logout_user, UserMixin, login_required
 from werkzeug.urls import url_parse
-from models import get_db_connection, User
+from src.models import get_db_connection, User
 from redis import Redis
 import rq
 import os

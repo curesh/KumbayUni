@@ -58,8 +58,8 @@ class Anon():
         scale = 1
 
         # Perform analysis on a lower number of frames, then interpolate in post-processing
-        if len(self.frames) > 2000:
-            scale = int(len(self.frames)/2000)
+        if len(self.frames) > 100:
+            scale = int(len(self.frames)/100)
 
         # Store various metadata
         self.frames_step = self.frames[::scale]
@@ -127,9 +127,10 @@ class Anon():
         max_frames_large_head = int(4*self.fps/self.scale_frame)
 
         # Load the face classifer
-        prof_face_cascade = cv.CascadeClassifier('/System/Volumes/Data/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/cv2/data/haarcascade_profileface.xml')
-        face_cascade = cv.CascadeClassifier('./assets/haarfiles/haarcascade_frontalface_default.xml')
-
+        #prof_face_cascade = cv.CascadeClassifier('/System/Volumes/Data/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/cv2/data/haarcascade_profileface.xml')
+        #face_cascade = cv.CascadeClassifier('./assets/haarfiles/haarcascade_frontalface_default.xml')
+        prof_face_cascade = cv.CascadeClassifier('../assets/haarfiles/haarcascade_profileface.xml')
+        face_cascade = cv.CascadeClassifier('../assets/haarfiles/haarcascade_frontalface_default.xml')        
         # For every frame in the sampled video, detect frontal faces (and sometimes profile faces depending on certain parameters)
         for i,  curr_frame in enumerate(self.frames_step):
             if i%50 == 0:
@@ -184,13 +185,19 @@ class Anon():
 
     # Draw all the rectangles in the list to the corresping frames in the original array of frames
     def _draw_rects(self, rects):
+        print("Beg of _draw_rects:")
+        print("rects shape: ", len(rects))
+        print("self.scale_frame: ", self.scale_frame)
+        print("Big shape: ", self.shape)
+        print("Small shape: ", self.shape_step)
         for i, rects_frame in enumerate(rects):
             for rect in rects_frame:
-                for j in range(i*self.scale_frame,(i+1)*self.scale_frame)
-                    if rect[2] == 0:
-                        rects[i].remove(rect)
-                        continue
-
+                if rect[2] == 0:
+                    rects[i].remove(rect)
+                    continue
+                for j in range(i*self.scale_frame,(i+1)*self.scale_frame):
+                    if self.shape[0] <= j:
+                        break
                     p1 = (int(max(0,rect[0]-0.25*rect[2])), int(max(0,rect[1]-0.25*rect[3])))
                     p2 = (int(min(self.shape[2],rect[0]+1.25*rect[2])), int(min(self.shape[1],rect[1]+1.25*rect[3])))
                     cv.rectangle(self.frames[j], p1, p2, (255, 255, 0), 4)
@@ -320,9 +327,10 @@ class Anon():
         
 # Driver function
 def main():
-    vid_dir = os.getcwd() + "/assets/test_data/vids/test1.mp4"
+    vid_dir = os.getcwd() + "/../assets/test_data/vids/vids_test_load_func/test1.mp4"
     anon = Anon(vid_dir)
     anon.anon_static()
+    anon.save_vid(os.getcwd() + "/../assets/test_data/vids/processed/testsave1.avi")
     for i in range(20):
         anon.play_vid(anon.frames)
     
