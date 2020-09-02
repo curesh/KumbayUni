@@ -22,7 +22,6 @@ class User(UserMixin):
         return check_password_hash(self.password_hash, password)
 
     def launch_task(self, name, description, *args, **kwargs):
-        print("launch task is db open?: ", is_open('database/database.db'))
         rq_job = current_app.task_queue.enqueue('src.tasks.' + name, self.id,
                                                 *args, **kwargs)
         task = Task(task_id=rq_job.get_id(), name=name, description=description,
@@ -45,17 +44,17 @@ class User(UserMixin):
         c.close()
         return ret
 
-def is_open(path):
-    for proc in psutil.process_iter():
-        try:
-            files = proc.open_files()
-            if files:
-                for _file in files:
-                    if _file.path == path:
-                        return True    
-        except psutil.NoSuchProcess as err:
-            print(err)
-    return False
+# def is_open(path):
+#     for proc in psutil.process_iter():
+#         try:
+#             files = proc.open_files()
+#             if files:
+#                 for _file in files:
+#                     if _file.path == path:
+#                         return True    
+#         except psutil.NoSuchProcess as err:
+#             print(err)
+#     return False
 
 def get_db_connection():
     conn = sqlite3.connect('database/database.db')
@@ -66,7 +65,6 @@ def get_db_connection():
 class Task():
     def __init__(self, task_id, name, description, user_id, complete=False):
         self.task_id = task_id
-        print("init of Task is database open?: ", is_open('database/database.db'))
         conn = get_db_connection()
         c = conn.execute("INSERT INTO tasks (task_id, name, description, complete, user_id) VALUES (?, ?, ?, ?, ?)",
                          (task_id, name, description, complete, user_id)

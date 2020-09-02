@@ -163,14 +163,17 @@ def create():
             os.chdir(curr_path)
             print("File uploaded succesfully")
             load_file = os.path.join(load_file, secure_filename(f.filename))
+            conn = get_db_connection()
             try:
-                conn = get_db_connection()
+
                 conn.execute('INSERT INTO lectures (file_name) VALUES (?)',
                              (f.filename,))
-                conn.commit()
-                conn.close()
             except:
                 print("Error in inserting lecture into database. That lecture is already there (UNIQUE failed). -CS")
+
+            finally:
+                conn.commit()
+                conn.close()
                 
             if current_user.get_task_in_progress('anon_vid'):
                 flash(_('A video is already being uploaded and anonymized'))
