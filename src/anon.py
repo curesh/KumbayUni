@@ -129,8 +129,8 @@ class Anon():
         # Load the face classifer
         #prof_face_cascade = cv.CascadeClassifier('/System/Volumes/Data/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/cv2/data/haarcascade_profileface.xml')
         #face_cascade = cv.CascadeClassifier('./assets/haarfiles/haarcascade_frontalface_default.xml')
-        prof_face_cascade = cv.CascadeClassifier('../assets/haarfiles/haarcascade_profileface.xml')
-        face_cascade = cv.CascadeClassifier('../assets/haarfiles/haarcascade_frontalface_default.xml')        
+        prof_face_cascade = cv.CascadeClassifier('static/assets/haarfiles/haarcascade_profileface.xml')
+        face_cascade = cv.CascadeClassifier('static/assets/haarfiles/haarcascade_frontalface_default.xml')        
         # For every frame in the sampled video, detect frontal faces (and sometimes profile faces depending on certain parameters)
         for i,  curr_frame in enumerate(self.frames_step):
             if i%50 == 0:
@@ -254,9 +254,13 @@ class Anon():
         plt.figure()
         plt.plot(first_elem_quant_rect, color='b')
 
-        quant_rect_tot, rects_tot = self.smooth_largest(rects_tot, quant_rect_tot, 1, 4)
-        quant_rect_tot, rects_tot = self._remove_overlapping(rects_tot)
 
+        quant_rect_tot, rects_tot = self.smooth_largest(rects_tot, quant_rect_tot, 1, 3)
+        quant_rect_tot, rects_tot = self.smooth_largest(rects_tot[::-1], quant_rect_tot[::-1], 1, 3)
+        quant_rect_tot = quant_rect_tot[::-1]
+        rects_tot = rects_tot[::-1]
+        quant_rect_tot, rects_tot = self._remove_overlapping(rects_tot)
+        
         self._draw_rects(rects_tot)
         first_elem_quant_rect = [vec[0] for vec in quant_rect_tot]
 
@@ -327,10 +331,10 @@ class Anon():
         
 # Driver function
 def main():
-    vid_dir = os.getcwd() + "/../assets/test_data/vids/vids_test_load_func/test1.mp4"
+    vid_dir = os.getcwd() + "/static/assets/test_data/vids/vids_test_load_func/test1.mp4"
     anon = Anon(vid_dir)
     anon.anon_static()
-    anon.save_vid(os.getcwd() + "/../assets/test_data/vids/processed/testsave1.avi")
+    anon.save_vid(os.getcwd() + "/static/assets/test_data/vids/processed/testsave1.avi")
     for i in range(20):
         anon.play_vid(anon.frames)
     

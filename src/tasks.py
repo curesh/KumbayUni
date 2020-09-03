@@ -26,22 +26,21 @@ def _set_task_progress(progress):
         job.save_meta()
         if progress >= 100:
             conn = get_db_connection()
-            c = conn.execute("UPDATE tasks SET complete = ? WHERE task_id = ?", (True, job.get_id()))
+            c = conn.execute("DELETE FROM tasks WHERE task_id = ?", (job.get_id(),))
+            #c = conn.execute("INSERT INTO lectures WHERE task_id = ?", (
             conn.commit()
             conn.close()
-
-
 
 def anonymize_video(user_id, load_file, save_file):
     try:
         _set_task_progress(0)
         anon_obj = Anon(load_file)
-        
         anon_obj.anon_static()
         # WARNING: You are rewriting the original video file here
-        anon.save_vid(save_file)
+        anon_obj.save_vid(save_file)
         
     except:
         app.logger.error('Unhandled exception', exc_info=sys.exc_info())
     finally:
+        conn = get_db_connection()
         _set_task_progress(100)
