@@ -7,7 +7,7 @@ CREATE TABLE links (
     link_id INTEGER PRIMARY KEY AUTOINCREMENT,
     created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     title TEXT NOT NULL,
-    link_hash TEXT NOT NULL,
+    link_hash TEXT NOT NULL UNIQUE,
     user_id INTEGER NOT NULL,
     FOREIGN KEY (user_id)
     	REFERENCES users (user_id) 

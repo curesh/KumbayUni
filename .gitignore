@@ -1,2 +1,6 @@
 *~
 #*#
+*.json
+*.pickle
+*.rdb
+*__pycache__*

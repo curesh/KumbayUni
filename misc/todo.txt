@@ -25,9 +25,15 @@ Features:
 
 Urgent Todo for tmrw:
 1. Try to get redis background jobs working using https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-xxii-background-jobs
-2. Try to get processed video displaying on the website after upload using the flask youtube video you were watching and other resources
-3. TBD
+   a) Mostly working. Now, get notification system working for background jobs.
+2. Now need to make the signup and upload video forms good so all the necessary information
+is there for a video title and description.
+3. It is a good idea to create a bulk upload option in the forms where you can upload a zip without having to enter in all those boxes for each one
+3. FavIcon
+4. deploy
+5. Apply smoothing algo to all rectangles (other than just the biggest)
 
 Status:
-Currently, there is some problem with the sqlite3 database being locked since there is another different connection already opened or something.
-I don't think there should be though, so I'm trying to track down that open connection
+Youtube hyperlink display for uploaded video is working. Now need to make the signup and upload video forms good so all the necessary information
+is there for a video title and description.
+Also need to fully deploy website onto the infinityfree domain.

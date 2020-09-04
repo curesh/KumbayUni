@@ -153,6 +153,11 @@ def allowed_images(filename):
 @app.route('/create', methods=('GET', 'POST'))
 @login_required
 def create():
+    
+    #Sample video title:
+    # UCLA Physics 1CH: Electrodynamics, Optics, and Special Relativity
+    # Discussion 1 by Trevor Scheopner
+    # Winter 2020
     if request.method == 'POST':
         f = request.files['file']
         print("f ", f)
@@ -191,7 +196,7 @@ def create():
             if current_user.get_task_in_progress('anonymize_video'):
                 flash('A video is already being uploaded and anonymized')
             else:
-                current_user.launch_task('anonymize_video', 'Uploading video...', load_file, save_file)
+                current_user.launch_task('anonymize_video', 'Uploading video...', load_file, save_file, [title, "Temp description"])
 
             return redirect(url_for('index'))
     return render_template('create.html')
