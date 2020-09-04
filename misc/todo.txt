@@ -35,5 +35,5 @@ is there for a video title and description.
 
 Status:
 Youtube hyperlink display for uploaded video is working. Now need to make the signup and upload video forms good so all the necessary information
-is there for a video title and description.
+is there for a video title and description. I just did some work on create.html for that (still need to update src/app.py)
 Also need to fully deploy website onto the infinityfree domain.
