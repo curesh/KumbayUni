@@ -8,6 +8,8 @@ import numpy as np
 import os
 import sys
 import matplotlib.pyplot as plt
+import subprocess
+from pathlib import Path
 
 # Global Constants
 
@@ -32,6 +34,7 @@ class Anon():
             self.shape_step = [1,1,1]
             self.scale_frame = 1
             self.fps = 1
+            self.vid_dir = vid_dir
             return None
         
         print("Constructing")
@@ -39,6 +42,9 @@ class Anon():
         vid = cv.VideoCapture(vid_dir)
         self.vid = vid
         frames = []
+
+
+
 
         # Collect the frames for the 
         while vid.isOpened():
@@ -62,6 +68,7 @@ class Anon():
             scale = int(len(self.frames)/100)
 
         # Store various metadata
+        self.vid_dir = vid_dir
         self.frames_step = self.frames[::scale]
         self.shape = np.shape(self.frames)
         print("Shape: ", self.shape)
@@ -255,8 +262,8 @@ class Anon():
         plt.plot(first_elem_quant_rect, color='b')
 
 
-        quant_rect_tot, rects_tot = self.smooth_largest(rects_tot, quant_rect_tot, 1, 3)
-        quant_rect_tot, rects_tot = self.smooth_largest(rects_tot[::-1], quant_rect_tot[::-1], 1, 3)
+        quant_rect_tot, rects_tot = self.smooth_largest(rects_tot, quant_rect_tot, 1, 4)
+        quant_rect_tot, rects_tot = self.smooth_largest(rects_tot[::-1], quant_rect_tot[::-1], 1, 4)
         quant_rect_tot = quant_rect_tot[::-1]
         rects_tot = rects_tot[::-1]
         quant_rect_tot, rects_tot = self._remove_overlapping(rects_tot)
@@ -313,6 +320,7 @@ class Anon():
     # This function plays a video given an array of frames
     def play_vid(self, frames):
         print("Len Frames: ", len(frames))
+        self.vid.set(cv.CAP_PROP_FPS, self.fps)
         cv.imshow("frame", frames[0])
         cv.waitKey(0)
         for frame in frames :
@@ -322,12 +330,27 @@ class Anon():
             
     # This function saves its own frames (WIP)
     def save_vid(self, save_path):
+        save_path_obj = Path(save_path)
+        vid_path_obj = Path(self.vid_dir)
         result = cv.VideoWriter(save_path,  
                          cv.VideoWriter_fourcc(*'MJPG'), 
-                         10, (self.shape[2], self.shape[1]))
+                         self.fps, (self.shape[2], self.shape[1]))
+        print("setting writer fps; ", result.get(cv.CAP_PROP_FPS), " to ", self.fps)
         for frame in self.frames:
             result.write(frame)
-        result.release() 
+        result.release()
+        # Get audio
+        out_full_video = str(save_path_obj.parent.joinpath(str(save_path_obj.stem)+"full"+save_path_obj.suffix))
+        out_audio = str(save_path_obj.parent.joinpath(str(save_path_obj.stem)+ ".wav"))
+        print("out_full_video: ", out_full_video)
+        print("out_audio: ", out_audio)
+        command_make_audio = ["ffmpeg", "-i", vid_path_obj, "-vn", out_audio]
+        command_make_combined = ["ffmpeg", "-i", save_path, "-i", out_audio, "-c:v", "copy", "-c:a", "aac", "-map", "0:v:0", "-map", "1:a:0", out_full_video]
+        command_rename = ["mv", out_full_video, save_path]
+        subprocess.run(command_make_audio)
+        subprocess.run(command_make_combined)
+        os.remove(save_path)
+        subprocess.run(command_rename)
         
 # Driver function
 def main():

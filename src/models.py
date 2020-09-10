@@ -28,19 +28,19 @@ class User(UserMixin):
         return task
     
     def get_tasks_in_progress(self):
-        conn = get_db_connection()
-        c = conn.execute("SELECT * FROM tasks WHERE user_id = ? AND complete = ?",
+        curr, conn = get_db_connection()
+        curr.execute("SELECT * FROM tasks WHERE user_id = ? AND complete = ?",
                          (self.id, False))
-        ret = c.fetchall()
+        ret = curr.fetchall()
         conn.close()
         return ret
 
     def get_task_in_progress(self, name):
-        conn = get_db_connection()
-        c = conn.execute("SELECT * FROM tasks WHERE name = ? AND user_id = ? AND complete = ?",
+        curr, conn = get_db_connection()
+        curr.execute("SELECT * FROM tasks WHERE name = ? AND user_id = ? AND complete = ?",
                          (name, self.id, False))
-        ret = c.fetchone()
-        c.close()
+        ret = curr.fetchone()
+        conn.close()
         return ret
 
 # def is_open(path):
@@ -58,14 +58,15 @@ class User(UserMixin):
 def get_db_connection():
     conn = sqlite3.connect('database/database.db')
     conn.row_factory = sqlite3.Row
-    return conn
+    curr = conn.cursor()
+    return curr, conn
 
 
 class Task():
     def __init__(self, task_id, name, description, user_id, complete=False):
         self.task_id = task_id
-        conn = get_db_connection()
-        c = conn.execute("INSERT INTO tasks (task_id, name, description, complete, user_id) VALUES (?, ?, ?, ?, ?)",
+        curr, conn = get_db_connection()
+        curr.execute("INSERT INTO tasks (task_id, name, description, complete, user_id) VALUES (?, ?, ?, ?, ?)",
                          (task_id, name, description, complete, user_id)
         )
         conn.commit()

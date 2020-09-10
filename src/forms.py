@@ -10,6 +10,9 @@ class LoginForm(FlaskForm):
     submit = SubmitField('Sign In')
 
 class RegistrationForm(FlaskForm):
+    first_name = StringField('First Name', validators=[DataRequired()])
+    last_name = StringField('Last Name', validators=[DataRequired()])
+    university = StringField('University', validators=[DataRequired()])
     username = StringField('Username', validators=[DataRequired()])
     email = StringField('Email', validators=[DataRequired(), Email()])
     password = PasswordField('Password', validators=[DataRequired()])
@@ -18,13 +21,15 @@ class RegistrationForm(FlaskForm):
     submit = SubmitField('Register')
 
     def validate_username(self, username):
-        conn = get_db_connection()
-        user = conn.execute("SELECT * FROM users WHERE username = (?)", [username.data,]).fetchone()
+        curr, conn = get_db_connection()
+        user = curr.execute("SELECT * FROM users WHERE username = (?)", [username.data,]).fetchone()
         if user is not None:
             raise ValidationError('Please use a different username.')
+        conn.close()
 
     def validate_email(self, email):
-        conn = get_db_connection()
-        user = conn.execute("SELECT * FROM users WHERE email = (?)", [email.data,]).fetchone()
+        curr, conn = get_db_connection()
+        user = curr.execute("SELECT * FROM users WHERE email = (?)", [email.data,]).fetchone()
         if user is not None:
             raise ValidationError('Please use a different email address.')
+        conn.close()

@@ -2,51 +2,119 @@
 
 {% block content %}
 <h1>{% block title %} Upload a lecture {% endblock %}</h1>
-
 <form method="post" enctype="multipart/form-data">
-  <div class="form-group">
-    <label for="Course Number">Course Number</label>
-    <input type="text" name="course_num"
-           placeholder="Physics 1CH" class="form-control"
-           value="{{ request.form['course_num'] }}"></input>
-  </div>
-  
-  <div class="form-group">
-    <label for="Course Name">Course Name</label>
-    <input type="text" name="course_name" placeholder="Electrodynamics, Optics, and Special Relativity"
-              class="form-control"
-              value ="{{ request.form['course_name'] }}"></input>
-  </div>
-
-  <div class="form-group">
-    <label for="Session">Session</label>
-    <input type="text" name="session" placeholder="Discussion 2"
-              class="form-control"
-              value="{{ request.form['session'] }}"></input>
-  </div>
-
-  <div class="form-group">
-    <label for="Term">Term</label>
-    <input type="text" name="term" placeholder="Winter 2020"
-              class="form-control"
-              value="{{ request.form['term'] }}"></input>
-  </div>
-
-  <div class="form-group">
-    <label for="Additional Description">Additional Description</label>
-    <textarea name="description" placeholder="..."
-              class="form-control"
-              value="{{ request.form['description'] }}"></textarea>
-  </div>
-  
-  <div class="form-group">
-    <label for="content">Select video . . .</label>
-
-    <input type="file" name="file" id="content" value="{{ request.form['file'] }}"></input>
+{% if not file_names %}
+    <div class="form-group">
+      <label for="Course Number">Course Number</label>
+      <input type="text" name="course_num"
+            placeholder="Physics 1CH" class="form-control"
+            value="{{ request.form['course_num'] }}"></input>
+    </div>
     
-  </div>
-  <div class="form-group">
-    <button type="submit" class="btn btn-primary">Submit</button>
-  </div>
+    <div class="form-group">
+      <label for="Course Name">Course Name</label>
+      <input type="text" name="course_name" placeholder="Electrodynamics, Optics, and Special Relativity"
+                class="form-control"
+                value ="{{ request.form['course_name'] }}"></input>
+    </div>
+
+    <div class="form-group">
+      <label for="Term">Select an academic term</label>
+      <select class="form-control" id="Term" name="Term">
+        <option>Fall</option>
+        <option>Winter</option>
+        <option>Spring</option>
+        <option>Summer</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="Year">Select the year</label>
+      <select class="form-control" id="Year" name="Year">
+        <option>2017</option>
+        <option>2018</option>
+        <option>2019</option>
+        <option>2020</option>
+        <option>2021</option>
+        <option>2022</option>
+        <option>2023</option>
+        <option>2024</option>
+        <option>2025</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="Instruction">Select the type of instruction</label>
+      <select class="form-control" id="Instruction" name="Instruction">
+        <option>Lecture</option>
+        <option>Discussion</option>
+        <option>Office Hours</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="Additional Description">Additional Description</label>
+      <textarea name="description" placeholder=" "
+                class="form-control"
+                value="{{ request.form['description'] }}"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label for="content">Select a file . . .</label>
+      <input type="file" name="file" id="content" value="{{ request.form['file'] }}"></input>
+    </div>
+
+    <div class="form-group">
+      <label for="file_type">Select an upload file type</label>
+      <select class="form-control" id="FileType" name="FileType">
+        <option>Compressed zip file</option>
+        <option>Video file (.mp4, .avi, .mov, .mkv, .wmv)</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <button type="submit" class="btn btn-primary" name="NextButton">Next</button>
+    </div>
+{% else %}
+  <label>NUMBER OF FILE_NAMES {{ file_names|length }}</label>
+  {% if file_names|length > 1 %}
+    <div class="form-group">
+      <!-- Simple List -->
+      <label for="SimpleList">Arrange the lectures in the correct viewing order</label>
+      <ul id="SimpleList" name="letters" class="list-group">
+        {% for file_name in file_names %}
+          <li class="list-group-item">{{ file_name }}<input type='hidden' name='letters[]' value='{{ file_name }}'/></li>
+          
+          <!-- Comment
+          <li class="list-group-item">B<input type='hidden' name='letters[]' value='B'/></li>
+          <li class="list-group-item">C<input type='hidden' name='letters[]' value='C'/></li>
+          <li class="list-group-item">D<input type='hidden' name='letters[]' value='D'/></li>
+          <li class="list-group-item">E<input type='hidden' name='letters[]' value='E'/></li>
+          -->
+        {% endfor %}
+      </ul>
+        
+      <script>
+        // Simple list
+        Sortable.create(SimpleList, { /* options */ });
+      </script>
+    </div>
+
+    <div class="form-group">
+      <button type="submit" class="btn btn-primary" name="SubmitButton">Submit</button>
+    </div>
+  {% else %}
+    <h3>File: {{ file_name }}</h3>
+    <div class="form-group">
+      <label for="lecture_num">Select the lecture number</label>
+      <input type="number" id="lecture_num" name="lecture_num" min="1" max="100">
+    </div>
+
+    <div class="form-group">
+      <button type="submit" class="btn btn-primary" name="SubmitButton">Submit</button>
+    </div>
+  {% endif %}
+  
+{% endif %}
 </form>
 {% endblock %}
