@@ -81,9 +81,9 @@
     <div class="form-group">
       <!-- Simple List -->
       <label for="SimpleList">Arrange the lectures in the correct viewing order</label>
-      <ul id="SimpleList" name="letters" class="list-group">
+      <ul id="SimpleList" name="lectures_list" class="list-group">
         {% for file_name in file_names %}
-          <li class="list-group-item">{{ file_name }}<input type='hidden' name='letters[]' value='{{ file_name }}'/></li>
+          <li class="list-group-item">{{ file_name }}<input type='hidden' name='lectures[]' value='{{ file_name }}'/></li>
           
           <!-- Comment
           <li class="list-group-item">B<input type='hidden' name='letters[]' value='B'/></li>

@@ -36,6 +36,9 @@ def get_meta(lecture_row):
     description = "The official course name is " + lecture_row[3] + ". " + "This course was recorded for the " + lecture_row[5] + " " + str(lecture_row[6]) + " academic term. " + lecture_row[8]
     return title, description
 
+def sort_table(row):
+    return row[9]
+
 def anonymize_video(user_id, orig_load_file, orig_save_file):
     # Things you need to do in task
     # Anonymize the video and save it in the processed folder
@@ -47,10 +50,11 @@ def anonymize_video(user_id, orig_load_file, orig_save_file):
     # Flag to check if databse connection is open
     open_db = False
     socket.setdefaulttimeout(600)  # set timeout to 10 minutes
-
+    
     try:
         curr, conn = get_db_connection()
         c = curr.execute("SELECT * FROM lectures").fetchall()
+        c.sort(key=sort_table)
         conn.close()
         for row in c:
             print("Current anonymization: ", row[2])
@@ -62,9 +66,6 @@ def anonymize_video(user_id, orig_load_file, orig_save_file):
             anon_obj.anon_static()
             # WARNING: You are rewriting the original video file here
             anon_obj.save_vid(save_file)
-            if os.path.exists(save_file):
-                print("IT exists in anon video after it has been \"saved\"!!")
-            print(save_file)
             link_hash = upload(save_file, title, description)
             open_db = True
             curr, conn = get_db_connection()

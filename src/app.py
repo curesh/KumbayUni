@@ -214,16 +214,16 @@ def create():
             # If Submit button is clicked
             # TODO: Check how many videos there are in sql lecture table, to find out if its zip or not
             print("Nextbutton is not clicked")
-            many = True
             curr, conn = get_db_connection()
-
-            if many:
+            num_lectures = len(curr.execute("SELECT * FROM lectures").fetchall())
+            if num_lectures > 1:
                 updated_order = request.form.getlist('lectures[]')
+                print("updated order: ", updated_order)
                 for i, lec_name in enumerate(updated_order):
                     #TODO Get the correct sqlite command for updating lectures table
-                    curr.execute("UPDATE lectures WHERE file_name = (?) TO lecture_num = (?)", (lec_name, i+1))
+                    curr.execute("UPDATE lectures SET lecture_num = (?) WHERE file_name = (?)", (i+1, lec_name))
             else:
-                curr.execute("UPDATE lectures WHERE lecture_id = (?) TO lecture_num = (?)", (1, 1))
+                curr.execute("UPDATE lectures SET lecture_num = (?) WHERE lecture_id = (?)", (1, 1))
             conn.commit()
             conn.close()
             save_file = os.path.join(app.config['UPLOAD_FOLDER'], "processed")
