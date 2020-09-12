@@ -10,12 +10,14 @@ import sys
 import matplotlib.pyplot as plt
 import subprocess
 from pathlib import Path
+import time
 
 # Global Constants
 
 # The dimensions for a zoom box are constant regardless of screen resolution in screen recordings
 ZOOM_WIDTH = 244
 ZOOM_HEIGHT = 138
+t0 = time.time()
 
 # Class used for storing the video frames, and relavent metadata
 class Anon():
@@ -39,12 +41,15 @@ class Anon():
         
         print("Constructing")
         # Initialize video capture
+
         vid = cv.VideoCapture(vid_dir)
+        t_videoCapture = time.time()
+        print("TIME after loading in videoCapture: ", t_videoCapture-t0)
         self.vid = vid
+        
+        self.fps = vid.get(cv.CAP_PROP_FPS)
+        print("Video FPS: ", self.fps)
         frames = []
-
-
-
 
         # Collect the frames for the 
         while vid.isOpened():
@@ -64,8 +69,8 @@ class Anon():
         scale = 1
 
         # Perform analysis on a lower number of frames, then interpolate in post-processing
-        if len(self.frames) > 100:
-            scale = int(len(self.frames)/100)
+        if len(self.frames) > 50:
+            scale = int(len(self.frames)/50)
 
         # Store various metadata
         self.vid_dir = vid_dir
@@ -74,7 +79,6 @@ class Anon():
         print("Shape: ", self.shape)
         self.shape_step = np.shape(self.frames_step)
         self.scale_frame = scale
-        self.fps = vid.get(cv.CAP_PROP_FPS)
         self.standard_rect = [int(self.shape[2]/3), int(self.shape[1]/3),
                               int(self.shape[2]/3), int(self.shape[1]/3)]
 
@@ -156,6 +160,7 @@ class Anon():
             # 3~6 is a good value for it.
             front_faces = face_cascade.detectMultiScale(gray, 1.1, 4)
             
+            # TODO: Do you need this order (redundant?)?
             rects, quant_rect = self._order_rects(list(front_faces))
             
             if not rects:
@@ -211,6 +216,16 @@ class Anon():
                     sub_face = self.frames[j][p1[1]:min(p2[1],self.shape[1]),p1[0]:min(p2[0], self.shape[2])]
                     sub_face = cv.GaussianBlur(sub_face, (171, 171), 60)
                     self.frames[j][p1[1]:min(p2[1],self.shape[1]),p1[0]:min(p2[0], self.shape[2])] = sub_face
+    
+    # Maybe check if they have similar areas, then check if they overlap a lot?
+    def _check_avg(self, avg_small_rects, check_rect):
+        for i, avg_rect in enumerate(avg_small_rects):
+            norm_avg_area = avg_rect[2]*avg_rect[3]/(self.shape[1]*self.shape[2])
+            norm_check_area = check_rect[2]*check_rect[3]/(self.shape[1]*self.shape[2])
+            if np.abs(norm_avg_area-norm_check_area) < 0.3:
+                if self._overlap_area(avg_rect[:-1], check_rect) > min(norm_check_area, norm_avg_area)/2:
+                    return i, avg_rect
+        return None, None
         
     # Smooth out the plot of the largest rectangle areas across all the frames. 
     # Do this adding a large rectangle to a given frame, if there were x (x may just be 1) large
@@ -220,16 +235,21 @@ class Anon():
         
         num_large = 1
         frames_since_large = 0
-        avg_large_rect = np.array([0,0,0,0])
+        avg_large_rect = [0,0,0,0]
+        avg_small_rects = []
         for i in range(len(rects)):
-
+            avg_small_rects_curr = []
+            avg_small_remove = []
+            rects_curr = []
             # If this rectangle is large, then note that, and add it to the running average of large
             # rectangles
             # NOTE: The 0.8 here is an important parameter and should be supplied from elsewhere
+            is_large = 0
             if rects[i][0][3] > max(int(avg_large_rect[3]*0.8),ZOOM_HEIGHT):
+                is_large = 1
                 if avg_large_rect[2] == 0:
                     avg_large_rect = rects[i][0].copy()
-                avg_large_rect = np.add(avg_large_rect, rects[i][0])/2
+                avg_large_rect = list(np.add(avg_large_rect, rects[i][0])/2)
                 num_large += 1
                 frames_since_large = 0
 
@@ -237,44 +257,74 @@ class Anon():
             elif frames_since_large < threshold_frames and num_large >= x:
                 if avg_large_rect[2] != 0:
                     insert_rect = [avg_large_rect[0]-frames_since_large, avg_large_rect[1]-frames_since_large, avg_large_rect[2]+frames_since_large, avg_large_rect[3]+frames_since_large]
-                    rects[i].insert(0, insert_rect)
-                    quants[i].insert(0, self._rect_func(insert_rect))
+                    rects_curr.append(insert_rect)
                 else:
-                    rects[i].insert(0, self.standard_rect)
-                    quants[i].insert(0, self._rect_func(self.standard_rect))
-                    rects[i], quants[i] = self._order_rects(rects[i])
+                    rects_curr.append(self.standard_rect)
 
             # Otherwise, keep the marked rectangle as is
             else:
                 avg_large_rect = [0,0,0,0]
-                num_large = 0
+                num_large = 1
                 
             frames_since_large += 1
+            
+            # For all rectangles in rects[i], add or update the corresponding rectangle in avg_small_rects
+            for j in range(is_large, len(rects[i])):
+                ind_small, small_rect_match = self._check_avg(avg_small_rects, rects[i][j])
+                if ind_small is not None:
+                    new_avg = np.add(avg_small_rects[ind_small][:-1], rects[i][j])/2
+                    avg_small_rects[ind_small] = list(np.append(new_avg,0))
+                else:
+                    avg_small_rects_curr.append(list(np.append(rects[i][j].copy(),0)))
+                    
+            # For all rectangles in avg_small_rects but not in rects (and within threshold frames ago), apply smoothing algorithm
+            for j, avg_rect in enumerate(avg_small_rects):
+                if avg_rect[4] != 0 and avg_rect[4] < threshold_frames:
+                    if avg_rect[2] != 0:
+                        insert_rect = [avg_rect[0]-avg_rect[4], avg_rect[1]-avg_rect[4], avg_rect[2]+avg_rect[4], avg_rect[3]+avg_rect[4]]
+                        rects_curr.append(insert_rect)
+                elif avg_rect[4] != 0:
+                    avg_small_remove.append(avg_rect)
+                avg_small_rects[j][4] += 1
+            # Add or remove the stored rects for this iteration "i"
+            for elem in avg_small_rects_curr:
+                avg_small_rects.append(elem)
+            for elem in avg_small_remove:
+                avg_small_rects.remove(elem)
+            for elem in rects_curr:
+                rects[i].append(elem)    
+            rects[i], quants[i] = self._order_rects(rects[i])
+            
         return quants, rects
     
     # Overarching anonymization function
     def anon_static(self):
         quant_rect_tot, rects_tot = self._find_zoom()
+        t2 = time.time()
+        print("TIME after _find_zoom(): ", t2-t0)
         first_elem_quant_rect = [vec[0] for vec in quant_rect_tot]
 
         # This plots the quantizations of the rectangles, before smoothign
         plt.figure()
         plt.plot(first_elem_quant_rect, color='b')
 
-
         quant_rect_tot, rects_tot = self.smooth_largest(rects_tot, quant_rect_tot, 1, 4)
+        t3 = time.time()
+        print("TIME after smooth forward: ", t3-t0)
         quant_rect_tot, rects_tot = self.smooth_largest(rects_tot[::-1], quant_rect_tot[::-1], 1, 4)
         quant_rect_tot = quant_rect_tot[::-1]
         rects_tot = rects_tot[::-1]
+        t4 = time.time()
+        print("TIME after smooth backwards: ", t4-t0)
         quant_rect_tot, rects_tot = self._remove_overlapping(rects_tot)
-        
         self._draw_rects(rects_tot)
         first_elem_quant_rect = [vec[0] for vec in quant_rect_tot]
-
+        t5 = time.time()
+        print("TIME after remove overlap and draw: ", t5-t0)
         # This plots the quantization of the rectangles after smoothing
-        plt.figure()
-        plt.plot(first_elem_quant_rect, color='r')
-        plt.show()
+        # plt.figure()
+        # plt.plot(first_elem_quant_rect, color='r')
+        # plt.show()
 
     # Return the area of overlapped region for two rectangles
     # If they don't overlap, return -1
@@ -344,32 +394,39 @@ class Anon():
         out_audio = str(save_path_obj.parent.joinpath(str(save_path_obj.stem)+ ".wav"))
         print("out_full_video: ", out_full_video)
         print("out_audio: ", out_audio)
-        command_make_audio = ["ffmpeg", "-i", vid_path_obj, "-vn", out_audio]
-        command_make_combined = ["ffmpeg", "-i", save_path, "-i", out_audio, "-c:v", "copy", "-c:a", "aac", "-map", "0:v:0", "-map", "1:a:0", out_full_video]
+        FNULL = open(os.devnull, 'w')
+        command_make_audio = ["ffmpeg", "-y", "-i", vid_path_obj, "-vn", out_audio]
+        command_make_combined = ["ffmpeg", "-y", "-i", save_path, "-i", out_audio, "-c:v", "copy", "-c:a", "aac", "-map", "0:v:0", "-map", "1:a:0", out_full_video]
         command_rename = ["mv", out_full_video, save_path]
-        subprocess.run(command_make_audio)
-        subprocess.run(command_make_combined)
+        subprocess.run(command_make_audio, stdout=FNULL, stderr=subprocess.STDOUT)
+        subprocess.run(command_make_combined, stdout=FNULL, stderr=subprocess.STDOUT)
         os.remove(save_path)
-        subprocess.run(command_rename)
+        os.remove(save_path[:-4])
+        subprocess.run(command_rename, stdout=FNULL, stderr=subprocess.STDOUT)
         
 # Driver function
 def main():
-    vid_dir = os.getcwd() + "/static/assets/test_data/vids/vids_test_load_func/test1.mp4"
+    vid_dir = os.getcwd() + "/static/assets/test_data/vids/vids_test_load_func/zoom_0.mp4"
     anon = Anon(vid_dir)
+    t1 = time.time()
+    print("TIME after construction: ", t1-t0)
     anon.anon_static()
-    anon.save_vid(os.getcwd() + "/static/assets/test_data/vids/processed/testsave1.avi")
-    for i in range(20):
-        anon.play_vid(anon.frames)
+    anon.save_vid(os.getcwd() + "/static/assets/test_data/vids/processed/zoomsave_0.avi")
+    t6 = time.time()
+    print("TIME (TOTAL) after saving: ", t6-t0)
+    # anon.play_vid(anon.frames)
     
     print("Shape frames:", np.shape(anon.frames))
     print("One frame shape: ", np.shape(anon.frames[0]))
 
 # Driver function used for testing and debugging
 def main_test():
-    vid_dir = os.getcwd() + "/assets/test_data/vids/test1.mp4"
-    anon = Anon()
-    print("greatest rect: ", anon._remove_overlapping([[[0, 20, 10, 10], [9, 30, 20, 20], [20, 30, 1, 1]]]))
-    print("overlap rect: ", anon._overlap_area([9, 30, 20, 20], [30, 30, 1, 1]))
+    vid_dir = os.getcwd() + "/static/assets/test_data/vids/vids_test_load_func/zoom_0.mp4"
+    vid = cv.VideoCapture(vid_dir)
+    num_frames = int(vid.get(cv.CAP_PROP_FRAME_COUNT))
+    fps = vid.get(cv.CAP_PROP_FPS)
+    print("num frames: ", num_frames)
+    print("fps: ", fps)
 
 if __name__ == "__main__":
-    main()
+    main_test()
