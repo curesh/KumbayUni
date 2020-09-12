@@ -16,7 +16,7 @@
 Features:
 1. A textbox that allows people to submit time points in the video that need to be blacked out or something
 2. Anonymization
-3. Tree Structure
+3. Tree Structure Repository
 4. Search box for finding video
 5. Make account (to upload not view)
 6. Upload video (it gets processed automatically and the anonymized version is uploaded)
@@ -24,16 +24,14 @@ Features:
 
 
 Urgent Todo for tmrw:
-1. Try to get redis background jobs working using https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-xxii-background-jobs
-   a) Mostly working. Now, get notification system working for background jobs.
-3. It is a good idea to create a bulk upload option in the forms where you can upload a zip without having to enter in all those boxes for each one
+1. Now, get notification system working for background jobs.
+2. (Done check) It is a good idea to create a bulk upload option in the forms where you can upload a zip without having to enter in all those boxes for each one
 3. FavIcon
 4. deploy
-5. Apply smoothing algo to all rectangles (other than just the biggest)
-6. Maybe eventually change the lecture number form input to dynamically take in [discussion/officehours/lecture]
-7. Make the smooth blur box size increase a function of the fps downsampling (cause sometimes it increases a lot and sometimes it doesn't)
-
+5. (Maybe) Make the smooth blur box size increase a function of the fps downsampling (cause sometimes it increases a lot and sometimes it doesn't)
+6. Record your own zoom video as a demo on the website
 Status:
-Youtube hyperlink display for uploaded video is working. Now need to make the signup and upload video forms good so all the necessary information
-is there for a video title and description. I just did some work on create.html for that (still need to update src/app.py)
-Also need to fully deploy website onto the infinityfree domain.
+Also need to fully deploy website onto the infinityfree domain or heroku.
+
+Ways to lower execution time:
+1. downsample video altogether at beginning instead of frame by frame
