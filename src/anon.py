@@ -48,19 +48,23 @@ class Anon():
         command_get_shape = "ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 " + vid_dir
         command_rename = ["mv", os.path.join(path_dir.parent, "lowres"+path_dir.name), vid_dir]
 
-        num_frames = subprocess.run(command_get_frames.split(), stdout=subprocess.PIPE).stdout.decode("utf-8")[:-2]
-        width, height = subprocess.run(command_get_shape.split(), stdout=subprocess.PIPE).stdout.decode("utf-8")[:-2].split("x")
+        num_frames = subprocess.run(command_get_frames.split(), stdout=subprocess.PIPE).stdout.decode("utf-8")
+        print("Num frames: ", num_frames)
+        width, height = subprocess.run(command_get_shape.split(), stdout=subprocess.PIPE).stdout.decode("utf-8").split("x")
+        print("Before Width height: ", width, ", ", height)
         width, height = (int(width), int(height))
-        if width > 1500 or height > 1500:
+        self.scale  = 1
+        if width > 1000 or height > 1000:
             print("Supposedly adjusting said properties")
-            scale = 1500/max(width, height)
-            width = str(int(width * scale))
-            height = str(int(height * scale))
-
-        command_lowres = "ffmpeg -i " + vid_dir + " -s " + width + "x" + height + " -vcodec mpeg4 -acodec copy " + os.path.join(path_dir.parent, "lowres"+path_dir.name)
-        subprocess.run(command_lowres.split(), stdout=FNULL, stderr=subprocess.STDOUT)
-        os.remove(vid_dir)
-        subprocess.run(command_rename, stdout=FNULL, stderr=subprocess.STDOUT)
+            self.scale = 1000/max(width, height)
+            width = int(width * self.scale)
+            height = int(height * self.scale)
+            
+            command_lowres = "ffmpeg -y -i " + vid_dir + " -s " + str(width) + "x" + str(height) + " -vcodec mpeg4 -q:v 20 -acodec copy " + os.path.join(path_dir.parent, "lowres"+path_dir.name)
+            subprocess.run(command_lowres.split())
+            os.remove(vid_dir)
+            subprocess.run(command_rename, stdout=FNULL, stderr=subprocess.STDOUT)
+        print("After downsampling Width height: ", width, ", ", height)
         
         self.vid = cv.VideoCapture(vid_dir)
         t_videoCapture = time.time()
@@ -69,30 +73,10 @@ class Anon():
         self.fps = self.vid.get(cv.CAP_PROP_FPS)
         print("Video FPS: ", self.fps)
         frames = []
-        
-        # Rescale if resolution is too expensive
-        self.scale=1
-        width  = self.vid.get(cv.CAP_PROP_FRAME_WIDTH)   # float
-        height = self.vid.get(cv.CAP_PROP_FRAME_HEIGHT)  # float
-        num_frames = vid.get(cv.CAP_PROP_FRAME_COUNT)    # float
-        
-        print("Supposed width, height from self.vid properties: ", width, ", ", height)
-        if width > 1000 or height > 1000:
-            print("Supposedly adjusting said properties")
-            self.scale = 1000/max(width, height)
-            width = int(width * self.scale)
-            height = int(height * self.scale)
-            # self.vid.set(3, width)
-            # self.vid.set(4, height)
-        width  = self.vid.get(cv.CAP_PROP_FRAME_WIDTH)   # float
-        height = self.vid.get(cv.CAP_PROP_FRAME_HEIGHT)  # float
-        print("width, height from self.vid properties after downsampling: ", width, ", ", height)
         # Collect the frames
         while self.vid.isOpened():
             ret, frame = self.vid.read()
             if ret:
-                # Downsample the video if the resolution is too high, to save space
-
                     # frame = cv.resize(frame, (width, height))
                 frames.append(frame)
             else:
@@ -101,8 +85,8 @@ class Anon():
         scale = 1
 
         # Perform analysis on a lower number of frames, then interpolate in post-processing
-        if len(self.frames) > 50:
-            scale = int(len(self.frames)/50)
+        if len(self.frames) > 100:
+            scale = int(len(self.frames)/100)
 
         # Store various metadata
         self.vid_dir = vid_dir
@@ -227,30 +211,6 @@ class Anon():
             
         return quant_rect_tot, rects_tot
 
-    # Draw all the rectangles in the list to the corresping frames in the original array of frames
-    def _draw_rects(self, rects):
-        print("Beg of _draw_rects:")
-        print("rects shape: ", len(rects))
-        print("self.scale_frame: ", self.scale_frame)
-        print("Big shape: ", self.shape)
-        print("Small shape: ", self.shape_step)
-        for i, rects_frame in enumerate(rects):
-            j_start = i*self.scale_frame
-            j_end = (i+1)*self.scale_frame
-            for rect in rects_frame:
-                if rect[2] == 0:
-                    rects[i].remove(rect)
-                    continue
-                p1 = (int(max(0,rect[0]-0.25*rect[2])), int(max(0,rect[1]-0.25*rect[3])))
-                p2 = (int(min(self.shape[2],rect[0]+1.25*rect[2])), int(min(self.shape[1],rect[1]+1.25*rect[3])))
-                sub_face_index = [p1[1],min(p2[1],self.shape[1]),p1[0],min(p2[0], self.shape[2])]
-                sub_face = self.frames[j_start][sub_face_index[0]:sub_face_index[1],sub_face_index[2]:sub_face_index[3]]
-                sub_face = cv.GaussianBlur(sub_face, (171, 171), 60)
-                for j in range(j_start, j_end):
-                    if self.shape[0] <= j:
-                        break
-                    # cv.rectangle(self.frames[j], p1, p2, (255, 255, 0), 4)
-                    self.frames[j][sub_face_index[0]:sub_face_index[1],sub_face_index[2]:sub_face_index[3]] = sub_face
     
     # Maybe check if they have similar areas, then check if they overlap a lot?
     def _check_avg(self, avg_small_rects, check_rect):
@@ -404,6 +364,31 @@ class Anon():
             quants.append(nonoverlap_quants)            
         return quants, rects
     
+    # Draw all the rectangles in the list to the corresping frames in the original array of frames
+    def _draw_rects(self, rects):
+        print("Beg of _draw_rects:")
+        print("rects shape: ", len(rects))
+        print("self.scale_frame: ", self.scale_frame)
+        print("Big shape: ", self.shape)
+        print("Small shape: ", self.shape_step)
+        for i, rects_frame in enumerate(rects):
+            j_start = i*self.scale_frame
+            j_end = (i+1)*self.scale_frame
+            for rect in rects_frame:
+                if rect[2] == 0:
+                    rects[i].remove(rect)
+                    continue
+                p1 = (int(max(0,rect[0]-0.25*rect[2])), int(max(0,rect[1]-0.25*rect[3])))
+                p2 = (int(min(self.shape[2],rect[0]+1.25*rect[2])), int(min(self.shape[1],rect[1]+1.25*rect[3])))
+                sub_face_index = [p1[1],min(p2[1],self.shape[1]),p1[0],min(p2[0], self.shape[2])]
+                sub_face = self.frames[j_start][sub_face_index[0]:sub_face_index[1],sub_face_index[2]:sub_face_index[3]]
+                sub_face = cv.GaussianBlur(sub_face, (171, 171), 60)
+                for j in range(j_start, j_end):
+                    if self.shape[0] <= j:
+                        break
+                    cv.rectangle(self.frames[j], p1, p2, (255, 255, 0), 4)
+                    self.frames[j][sub_face_index[0]:sub_face_index[1],sub_face_index[2]:sub_face_index[3]] = sub_face
+    
     # This function plays a video given an array of frames
     def play_vid(self, frames):
         print("Len Frames: ", len(frames))
@@ -420,7 +405,7 @@ class Anon():
         save_path_obj = Path(save_path)
         vid_path_obj = Path(self.vid_dir)
         result = cv.VideoWriter(save_path,  
-                         cv.VideoWriter_fourcc(*'MJPG'), 
+                         cv.VideoWriter_fourcc(*'H264'), 
                          self.fps, (self.shape[2], self.shape[1]))
         print("setting writer fps; ", result.get(cv.CAP_PROP_FPS), " to ", self.fps)
         for frame in self.frames:
@@ -443,12 +428,12 @@ class Anon():
         
 # Driver function
 def main():
-    vid_dir = os.getcwd() + "/static/assets/test_data/vids/vids_test_load_func/test2.mp4"
+    vid_dir = os.getcwd() + "/static/assets/test_data/vids/vids_test_load_func/test1.mp4"
     anon = Anon(vid_dir)
     t1 = time.time()
     print("TIME after construction: ", t1-t0)
     anon.anon_static()
-    anon.save_vid(os.getcwd() + "/static/assets/test_data/vids/processed/testsave2.avi")
+    anon.save_vid(os.getcwd() + "/static/assets/test_data/vids/processed/testsave1.mp4")
     t6 = time.time()
     print("TIME (TOTAL) after saving: ", t6-t0)
     # anon.play_vid(anon.frames)
@@ -458,7 +443,7 @@ def main():
 
 # Driver function used for testing and debugging
 def main_test():
-    vid_dir = os.getcwd() + "/static/assets/test_data/vids/vids_test_load_func/test1.mp4"
+    vid_dir = os.getcwd() + "/static/assets/test_data/vids/vids_test_load_func/test2.mp4"
     path_dir = Path(vid_dir)
     # Downsample video file using ffmpeg
     command_get_frames = "ffprobe -v error -select_streams v:0 -show_entries stream=nb_frames -of default=nokey=1:noprint_wrappers=1 " + vid_dir
@@ -468,22 +453,20 @@ def main_test():
     num_frames = subprocess.run(command_get_frames.split(), stdout=subprocess.PIPE).stdout.decode("utf-8")
     print("Num frames: ", num_frames)
     width, height = subprocess.run(command_get_shape.split(), stdout=subprocess.PIPE).stdout.decode("utf-8").split("x")
-    print(" pre Width height: ", width, ", ", height)
+    print("pre Width height: ", width, ", ", height)
     width, height = (int(width), int(height))
-    print("Width height: ", width, ", ", height)
     if width > 1500 or height > 1500:
         print("Supposedly adjusting said properties")
         scale = 1500/max(width, height)
         width = int(width * scale)
         height = int(height * scale)
-    command_lowres = "ffmpeg -i " + vid_dir + " -s " + str(width) + "x" + str(height) + " -vcodec mpeg4 -acodec copy " + os.path.join(path_dir.parent, "lowres"+path_dir.name)
-    subprocess.run(command_lowres.split())
-    os.remove(vid_dir)
-    subprocess.run(command_rename, stdout=FNULL, stderr=subprocess.STDOUT)
-    width, height = subprocess.run(command_get_shape.split(), stdout=subprocess.PIPE).stdout.decode("utf-8")[:-2].split("x")
-    width, height = (int(width), int(height))
+        
+        command_lowres = "ffmpeg -i " + vid_dir + " -s " + str(width) + "x" + str(height) + " -vcodec mpeg4 -q:v 20 -acodec copy " + os.path.join(path_dir.parent, "lowres"+path_dir.name)
+        subprocess.run(command_lowres.split())
+        # os.remove(vid_dir)
+        # subprocess.run(command_rename, stdout=FNULL, stderr=subprocess.STDOUT)
     print("Width height: ", width, ", ", height)
     vid = cv.VideoCapture(vid_dir)
     
 if __name__ == "__main__":
-    main_test()
+    main()
