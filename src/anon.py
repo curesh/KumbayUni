@@ -48,7 +48,7 @@ class Anon():
         command_get_shape = "ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 " + vid_dir
         command_rename = ["mv", os.path.join(path_dir.parent, "lowres"+path_dir.name), vid_dir]
 
-        num_frames = subprocess.run(command_get_frames.split(), stdout=subprocess.PIPE).stdout.decode("utf-8")
+        num_frames = int(subprocess.run(command_get_frames.split(), stdout=subprocess.PIPE).stdout.decode("utf-8"))
         print("Num frames: ", num_frames)
         width, height = subprocess.run(command_get_shape.split(), stdout=subprocess.PIPE).stdout.decode("utf-8").split("x")
         print("Before Width height: ", width, ", ", height)
@@ -61,7 +61,7 @@ class Anon():
             height = int(height * self.scale)
             
             command_lowres = "ffmpeg -y -i " + vid_dir + " -s " + str(width) + "x" + str(height) + " -vcodec mpeg4 -q:v 20 -acodec copy " + os.path.join(path_dir.parent, "lowres"+path_dir.name)
-            subprocess.run(command_lowres.split())
+            subprocess.run(command_lowres.split(), stdout=FNULL, stderr=subprocess.STDOUT)
             os.remove(vid_dir)
             subprocess.run(command_rename, stdout=FNULL, stderr=subprocess.STDOUT)
         print("After downsampling Width height: ", width, ", ", height)
@@ -72,25 +72,26 @@ class Anon():
         
         self.fps = self.vid.get(cv.CAP_PROP_FPS)
         print("Video FPS: ", self.fps)
-        frames = []
+        self.frames = np.empty((num_frames, height, width, 3), np.dtype('uint8'))
         # Collect the frames
-        while self.vid.isOpened():
+        count_frames = 0
+        while self.vid.isOpened() and count_frames < num_frames:
             ret, frame = self.vid.read()
             if ret:
                     # frame = cv.resize(frame, (width, height))
-                frames.append(frame)
+                self.frames[count_frames] = frame
+                count_frames += 1
             else:
                 break
-        self.frames = frames
         scale = 1
 
         # Perform analysis on a lower number of frames, then interpolate in post-processing
-        if len(self.frames) > 100:
-            scale = int(len(self.frames)/100)
+        if len(self.frames) > 50:
+            scale = int(len(self.frames)/50)
 
         # Store various metadata
         self.vid_dir = vid_dir
-        self.frames_step = self.frames[::scale]
+        self.frames_step = self.frames[::scale].copy()
         self.shape = np.shape(self.frames)
         print("Shape: ", self.shape)
         self.shape_step = np.shape(self.frames_step)
@@ -105,6 +106,8 @@ class Anon():
         print("Destructing")
         if self.vid is not None:
             self.vid.release()
+        t_done = time.time()
+        print("TIME TOTAL: ", t_done-t0)
         
     # Preprocess the video (get frames, etc.)
     def _preprocess(self):
@@ -276,7 +279,7 @@ class Anon():
             for j, avg_rect in enumerate(avg_small_rects):
                 if avg_rect[4] != 0 and avg_rect[4] < threshold_frames:
                     if avg_rect[2] != 0:
-                        insert_rect = [avg_rect[0]-avg_rect[4], avg_rect[1]-avg_rect[4], avg_rect[2]+avg_rect[4], avg_rect[3]+avg_rect[4]]
+                        insert_rect = [avg_rect[0]-3*avg_rect[4], avg_rect[1]-3*avg_rect[4], avg_rect[2]+3*avg_rect[4], avg_rect[3]+3*avg_rect[4]]
                         rects_curr.append(insert_rect)
                 elif avg_rect[4] != 0:
                     avg_small_remove.append(avg_rect)
@@ -303,10 +306,10 @@ class Anon():
         plt.figure()
         plt.plot(first_elem_quant_rect, color='b')
 
-        quant_rect_tot, rects_tot = self.smooth_largest(rects_tot, quant_rect_tot, 1, 4)
+        quant_rect_tot, rects_tot = self.smooth_largest(rects_tot, quant_rect_tot, 1, 5)
         t3 = time.time()
         print("TIME after smooth forward: ", t3-t0)
-        quant_rect_tot, rects_tot = self.smooth_largest(rects_tot[::-1], quant_rect_tot[::-1], 1, 4)
+        quant_rect_tot, rects_tot = self.smooth_largest(rects_tot[::-1], quant_rect_tot[::-1], 1, 5)
         quant_rect_tot = quant_rect_tot[::-1]
         rects_tot = rects_tot[::-1]
         t4 = time.time()
@@ -378,15 +381,15 @@ class Anon():
                 if rect[2] == 0:
                     rects[i].remove(rect)
                     continue
-                p1 = (int(max(0,rect[0]-0.25*rect[2])), int(max(0,rect[1]-0.25*rect[3])))
-                p2 = (int(min(self.shape[2],rect[0]+1.25*rect[2])), int(min(self.shape[1],rect[1]+1.25*rect[3])))
+                p1 = (int(max(0,rect[0]-0.45*rect[2])), int(max(0,rect[1]-0.45*rect[3])))
+                p2 = (int(min(self.shape[2],rect[0]+1.45*rect[2])), int(min(self.shape[1],rect[1]+1.45*rect[3])))
                 sub_face_index = [p1[1],min(p2[1],self.shape[1]),p1[0],min(p2[0], self.shape[2])]
                 sub_face = self.frames[j_start][sub_face_index[0]:sub_face_index[1],sub_face_index[2]:sub_face_index[3]]
                 sub_face = cv.GaussianBlur(sub_face, (171, 171), 60)
                 for j in range(j_start, j_end):
                     if self.shape[0] <= j:
                         break
-                    cv.rectangle(self.frames[j], p1, p2, (255, 255, 0), 4)
+                    # cv.rectangle(self.frames[j], p1, p2, (255, 255, 0), 4)
                     self.frames[j][sub_face_index[0]:sub_face_index[1],sub_face_index[2]:sub_face_index[3]] = sub_face
     
     # This function plays a video given an array of frames
@@ -405,7 +408,7 @@ class Anon():
         save_path_obj = Path(save_path)
         vid_path_obj = Path(self.vid_dir)
         result = cv.VideoWriter(save_path,  
-                         cv.VideoWriter_fourcc(*'H264'), 
+                         cv.VideoWriter_fourcc(*'mp4v'), 
                          self.fps, (self.shape[2], self.shape[1]))
         print("setting writer fps; ", result.get(cv.CAP_PROP_FPS), " to ", self.fps)
         for frame in self.frames:
@@ -435,7 +438,7 @@ def main():
     anon.anon_static()
     anon.save_vid(os.getcwd() + "/static/assets/test_data/vids/processed/testsave1.mp4")
     t6 = time.time()
-    print("TIME (TOTAL) after saving: ", t6-t0)
+    print("TIME after saving: ", t6-t0)
     # anon.play_vid(anon.frames)
     
     print("Shape frames:", np.shape(anon.frames))
@@ -444,6 +447,7 @@ def main():
 # Driver function used for testing and debugging
 def main_test():
     vid_dir = os.getcwd() + "/static/assets/test_data/vids/vids_test_load_func/test2.mp4"
+    print("Vid_dir: ", vid_dir)
     path_dir = Path(vid_dir)
     # Downsample video file using ffmpeg
     command_get_frames = "ffprobe -v error -select_streams v:0 -show_entries stream=nb_frames -of default=nokey=1:noprint_wrappers=1 " + vid_dir

@@ -35,3 +35,16 @@ Also need to fully deploy website onto the infinityfree domain or heroku.
 
 Ways to lower execution time:
 1. downsample video altogether at beginning instead of frame by frame
+
+Table of execution times based on input
+Input ---------- Notes ---- time (sec/frame)
+============================================
+test1.mp4 ------       ---- 0.0140
+test1.mp4 ------       ---- 0.0126
+test2.mp4 ------       ---- 0.0153
+test2.mp4 ------ repeat test so fast caching might be the culprit ----- 0.0108
+test2.mp4 ------  " "  ---- 0.0132
+test1.mp4 ------ no rect -- 0.0099
+test1.mp4 ------ np arr --- 0.0093
+test2.mp4 ------ np arr --- 0.0053
+test1.mp4 ------       ---- 0.0090
