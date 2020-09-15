@@ -3,6 +3,14 @@
 # Ideas that need implementing
 # 1. Check if its a real world image or a screenrecording by doing some stastics on curr_frame, or maybe some machine learning model
 
+# Outline of large input execution
+# 1. Downsample using ffmpeg
+# 2. Sample every nth frame such that you have less than 1000 frames sampled. Process these frames using face detection
+# 3. Read the entire video and interpolate face detection to the current frame as you are reading it.
+
+# Problems that need solving
+# 1. For draw_rects, what if some frames don't have any rectangles? It will get skipped in the drawing phase
+
 import cv2 as cv
 import numpy as np
 import os
@@ -18,22 +26,20 @@ import time
 ZOOM_WIDTH = 244
 ZOOM_HEIGHT = 138
 FNULL = open(os.devnull, 'w')
-t0 = time.time()
+T_START = time.time()
 
 # Class used for storing the video frames, and relavent metadata
 class Anon():
 
     # Initialize instance variables
-    def __init__(self, vid_dir=None):
-        path_dir = Path(vid_dir)
+    def __init__(self, vid_dir=None, save_path=None):
         # Alternate "Constructor" used for testing
-        if vid_dir == None:
+        if vid_dir == None or save_path == None:
             print("Test_main Activated")
             self.vid = None
             self.scale = 1
-            self.frames = []
             self.frames_step = []
-            self.shape = [1,1,1]
+            self.shape = [1,625,1000,1]
             self.shape_step = [1,1,1]
             self.scale_frame = 1
             self.fps = 1
@@ -48,54 +54,61 @@ class Anon():
         command_get_shape = "ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 " + vid_dir
         command_rename = ["mv", os.path.join(path_dir.parent, "lowres"+path_dir.name), vid_dir]
 
-        num_frames = int(subprocess.run(command_get_frames.split(), stdout=subprocess.PIPE).stdout.decode("utf-8"))
-        print("Num frames: ", num_frames)
+        num_frames = int(subprocess.run(command_get_frames.split(), stdout=subprocess.PIPE).stdout.decode("utf-8")[:-1])
+
         width, height = subprocess.run(command_get_shape.split(), stdout=subprocess.PIPE).stdout.decode("utf-8").split("x")
-        print("Before Width height: ", width, ", ", height)
+        print("Original width, height: ", width, ", ", height)
         width, height = (int(width), int(height))
-        self.scale  = 1
+        self.scale = 1
         if width > 1000 or height > 1000:
-            print("Supposedly adjusting said properties")
             self.scale = 1000/max(width, height)
             width = int(width * self.scale)
             height = int(height * self.scale)
-            
             command_lowres = "ffmpeg -y -i " + vid_dir + " -s " + str(width) + "x" + str(height) + " -vcodec mpeg4 -q:v 20 -acodec copy " + os.path.join(path_dir.parent, "lowres"+path_dir.name)
             subprocess.run(command_lowres.split(), stdout=FNULL, stderr=subprocess.STDOUT)
-            os.remove(vid_dir)
-            subprocess.run(command_rename, stdout=FNULL, stderr=subprocess.STDOUT)
-        print("After downsampling Width height: ", width, ", ", height)
-        
+            vid_dir = os.path.join(path_dir.parent, "lowres"+path_dir.name)
+            # os.remove(vid_dir)
+            # subprocess.run(command_rename, stdout=FNULL, stderr=subprocess.STDOUT)
+        print("Width height: ", width, ", ", height)
+        self.shape = (num_frames, height, width, 3)
         self.vid = cv.VideoCapture(vid_dir)
-        t_videoCapture = time.time()
-        print("TIME after loading in videoCapture: ", t_videoCapture-t0)
-        
+        t1 = time.time()
+        print("TIME after downsampling: ", t1-T_START)
+        t2 = time.time()
+        print("TIME after loading into vid capture: ", t2-T_START)
         self.fps = self.vid.get(cv.CAP_PROP_FPS)
         print("Video FPS: ", self.fps)
-        self.frames = np.empty((num_frames, height, width, 3), np.dtype('uint8'))
-        # Collect the frames
-        count_frames = 0
-        while self.vid.isOpened() and count_frames < num_frames:
+        scale_frame = int(self.shape[0]/50)
+        print("scale_frame: ", scale_frame)
+        small_shape = (51, self.shape[1], self.shape[2], 3)
+        print("Shape and total_frames: ", small_shape, ", ", self.shape[0])
+        self.frames_step = np.empty(small_shape, np.dtype('uint8'))
+        for i_small, i_big in enumerate(range(0,self.shape[0],scale_frame)):
+            self.vid.set(cv.CAP_PROP_POS_FRAMES, i_big)
             ret, frame = self.vid.read()
             if ret:
-                    # frame = cv.resize(frame, (width, height))
-                self.frames[count_frames] = frame
-                count_frames += 1
+                self.frames_step[i_small] = frame
+                # cv.imshow("frame", self.frames_step[i_small])
+                # cv.waitKey(0)
             else:
                 break
-        scale = 1
+        self.vid.set(cv.CAP_PROP_POS_FRAMES, 0)
+        t3 = time.time()
+        print("TIME after reading through all the frames: ", t3-T_START)
+        
+        # Videowriter instance variables
+        self.save_path = save_path
 
-        # Perform analysis on a lower number of frames, then interpolate in post-processing
-        if len(self.frames) > 50:
-            scale = int(len(self.frames)/50)
+        self.writer = cv.VideoWriter(save_path,  
+                         cv.VideoWriter_fourcc(*'mp4v'), 
+                         self.fps, (self.shape[2], self.shape[1]))
+        print("setting writer fps; ", self.writer.get(cv.CAP_PROP_FPS), " to ", self.fps)
 
         # Store various metadata
+        self.frames = None
         self.vid_dir = vid_dir
-        self.frames_step = self.frames[::scale].copy()
-        self.shape = np.shape(self.frames)
-        print("Shape: ", self.shape)
         self.shape_step = np.shape(self.frames_step)
-        self.scale_frame = scale
+        self.scale_frame = scale_frame
         self.standard_rect = [int(self.shape[2]/3), int(self.shape[1]/3),
                               int(self.shape[2]/3), int(self.shape[1]/3)]
 
@@ -104,10 +117,12 @@ class Anon():
     # Destructor
     def __del__(self):
         print("Destructing")
-        if self.vid is not None:
+        try:
             self.vid.release()
+        except:
+            print("self.vid not created yet")
         t_done = time.time()
-        print("TIME TOTAL: ", t_done-t0)
+        print("TIME TOTAL: ", t_done-T_START)
         
     # Preprocess the video (get frames, etc.)
     def _preprocess(self):
@@ -130,6 +145,12 @@ class Anon():
             if self._rect_func(rect) > self._rect_func(ans):
                 ans = rect
         return ans
+    
+    # This function enlarges every rect by a constant factor (to full cover the heady and upper body)
+    def _get_larger_rect(self, rect):
+        rect_big = [int(max(0,rect[0]-0.45*rect[2])), int(max(0,rect[1]-0.65*rect[3])),
+                    int(min(self.shape[2],1.9*rect[2])), int(min(self.shape[1],2.3*rect[3]))]
+        return rect_big
 
     # Orders array of rectangles of greatest to least (as determined by _rect_func), and returns their quantized values
     def _order_rects(self, rects, quants=None):
@@ -180,7 +201,7 @@ class Anon():
             front_faces = face_cascade.detectMultiScale(gray, 1.1, 4)
             
             # TODO: Do you need this order (redundant?)?
-            rects, quant_rect = self._order_rects(list(front_faces))
+            rects, quant_rect = self._order_rects([list(elem) for elem in front_faces])
             
             if not rects:
                 rects = [[0,0,0,0]]
@@ -204,6 +225,7 @@ class Anon():
                     both_side_faces = left_side_faces.extend([list(elem) for elem in right_side_faces])
                 max_both_rect = self._find_greatest_rect(both_side_faces)
                 if max_both_rect and (max_both_rect[3] > ZOOM_HEIGHT):
+                    
                     rects.insert(0, max_both_rect)
                     quant_rect.insert(0, self._rect_func(max_both_rect))
 
@@ -268,6 +290,8 @@ class Anon():
             
             # For all rectangles in rects[i], add or update the corresponding rectangle in avg_small_rects
             for j in range(is_large, len(rects[i])):
+                if rects[i][j][2] == 0:
+                    continue
                 ind_small, small_rect_match = self._check_avg(avg_small_rects, rects[i][j])
                 if ind_small is not None:
                     new_avg = np.add(avg_small_rects[ind_small][:-1], rects[i][j])/2
@@ -299,28 +323,28 @@ class Anon():
     def anon_static(self):
         quant_rect_tot, rects_tot = self._find_zoom()
         t2 = time.time()
-        print("TIME after _find_zoom(): ", t2-t0)
+        print("TIME after _find_zoom(): ", t2-T_START)
         first_elem_quant_rect = [vec[0] for vec in quant_rect_tot]
 
-        # This plots the quantizations of the rectangles, before smoothign
-        plt.figure()
-        plt.plot(first_elem_quant_rect, color='b')
+        # This plots the quantizations of the rectangles, before smoothing
+        # plt.figure()
+        # plt.plot(first_elem_quant_rect, color='b')
 
         quant_rect_tot, rects_tot = self.smooth_largest(rects_tot, quant_rect_tot, 1, 5)
         t3 = time.time()
-        print("TIME after smooth forward: ", t3-t0)
+        print("TIME after smooth forward: ", t3-T_START)
         quant_rect_tot, rects_tot = self.smooth_largest(rects_tot[::-1], quant_rect_tot[::-1], 1, 5)
         quant_rect_tot = quant_rect_tot[::-1]
         rects_tot = rects_tot[::-1]
         t4 = time.time()
-        print("TIME after smooth backwards: ", t4-t0)
+        print("TIME after smooth backwards: ", t4-T_START)
         quant_rect_tot, rects_tot = self._remove_overlapping(rects_tot)
         t_remove_overlap = time.time()
-        print("TIME after remove overlap: ", t_remove_overlap-t0)
+        print("TIME after remove overlap: ", t_remove_overlap-T_START)
         self._draw_rects(rects_tot)
         first_elem_quant_rect = [vec[0] for vec in quant_rect_tot]
         t5 = time.time()
-        print("TIME after draw: ", t5-t0)
+        print("TIME after draw: ", t5-T_START)
         # This plots the quantization of the rectangles after smoothing
         # plt.figure()
         # plt.plot(first_elem_quant_rect, color='r')
@@ -341,7 +365,8 @@ class Anon():
     def _remove_overlapping(self, rects):
         quants = []
         for i, rects_frame in enumerate(rects):
-            
+            # This is so that the overlap is calculated on the enlarged rectangles (that will eventuall be used)
+            rects_frame = [self._get_larger_rect(elem_rect) for elem_rect in rects_frame]
             # This is the array of rectangles that you need to empty. It is sorted from greatest to least
             check_rects = rects_frame.copy()
             nonoverlap_rects = []
@@ -367,30 +392,43 @@ class Anon():
             quants.append(nonoverlap_quants)            
         return quants, rects
     
-    # Draw all the rectangles in the list to the corresping frames in the original array of frames
     def _draw_rects(self, rects):
-        print("Beg of _draw_rects:")
-        print("rects shape: ", len(rects))
-        print("self.scale_frame: ", self.scale_frame)
-        print("Big shape: ", self.shape)
-        print("Small shape: ", self.shape_step)
-        for i, rects_frame in enumerate(rects):
-            j_start = i*self.scale_frame
-            j_end = (i+1)*self.scale_frame
-            for rect in rects_frame:
+        # Main container for all the frames in the video
+        shape_frames = list(self.frames_step.shape)
+        shape_frames[0] = (self.scale_frame)*1
+        shape_frames = tuple(shape_frames)
+        for i, rects_frame in enumerate(rects):  # Loop through all the frames in the sampled array
+            k_start = i*self.scale_frame
+            if i%1 == 0:
+                k_buff = k_start
+                if i != 0:
+                    for frame in self.frames:
+                        self.writer.write(frame)
+                self.frames = np.empty(shape_frames, np.dtype('uint8'))
+            k_end = (i+1)*self.scale_frame
+            # k_buff = k_start - (i-i%2)*self.scale_frame
+            for k in range(k_start-k_buff, k_end-k_buff):
+                ret, frame = self.vid.read()
+                if self.shape[0] <= k or not ret:
+                    k_end = k
+                    break
+                self.frames[k] = frame
+                
+            for j, rect in enumerate(rects_frame):   # Loop through all the rectangles in a single frame
                 if rect[2] == 0:
                     rects[i].remove(rect)
                     continue
-                p1 = (int(max(0,rect[0]-0.45*rect[2])), int(max(0,rect[1]-0.45*rect[3])))
-                p2 = (int(min(self.shape[2],rect[0]+1.45*rect[2])), int(min(self.shape[1],rect[1]+1.45*rect[3])))
-                sub_face_index = [p1[1],min(p2[1],self.shape[1]),p1[0],min(p2[0], self.shape[2])]
-                sub_face = self.frames[j_start][sub_face_index[0]:sub_face_index[1],sub_face_index[2]:sub_face_index[3]]
+                # p1 = (int(max(0,rect[0]-0.45*rect[2])), int(max(0,rect[1]-0.45*rect[3])))
+                # p2 = (int(min(self.shape[2],rect[0]+1.45*rect[2])), int(min(self.shape[1],rect[1]+1.45*rect[3])))
+                p1 = (int(max(0,rect[0])), int(max(0,rect[1])))
+                p2 = (int(min(self.shape[2],rect[0]+rect[2])), int(min(self.shape[1],rect[1]+rect[3])))
+                sub_face_index = [p1[1],p2[1],p1[0],p2[0]]
+                sub_face = self.frames_step[i][sub_face_index[0]:sub_face_index[1],sub_face_index[2]:sub_face_index[3]]
                 sub_face = cv.GaussianBlur(sub_face, (171, 171), 60)
-                for j in range(j_start, j_end):
-                    if self.shape[0] <= j:
-                        break
-                    # cv.rectangle(self.frames[j], p1, p2, (255, 255, 0), 4)
-                    self.frames[j][sub_face_index[0]:sub_face_index[1],sub_face_index[2]:sub_face_index[3]] = sub_face
+                for k in range(k_start-k_buff, k_end-k_buff):   # Loop through the frames in between two adjacent sampled frames
+                    # cv.rectangle(self.frames[k], p1, p2, (255, 255, 0), 4)
+                    self.frames[k][sub_face_index[0]:sub_face_index[1],sub_face_index[2]:sub_face_index[3]] = sub_face
+        self.writer.release()
     
     # This function plays a video given an array of frames
     def play_vid(self, frames):
@@ -403,17 +441,10 @@ class Anon():
             if cv.waitKey(4) & 0xFF == ord('q'):
                 break
             
-    # This function saves its own frames (WIP)
-    def save_vid(self, save_path):
-        save_path_obj = Path(save_path)
+    # This function saves its own frames
+    def save_audio(self):
+        save_path_obj = Path(self.save_path)
         vid_path_obj = Path(self.vid_dir)
-        result = cv.VideoWriter(save_path,  
-                         cv.VideoWriter_fourcc(*'mp4v'), 
-                         self.fps, (self.shape[2], self.shape[1]))
-        print("setting writer fps; ", result.get(cv.CAP_PROP_FPS), " to ", self.fps)
-        for frame in self.frames:
-            result.write(frame)
-        result.release()
         # Get audio
         out_full_video = str(save_path_obj.parent.joinpath(str(save_path_obj.stem)+"full"+save_path_obj.suffix))
         out_audio = str(save_path_obj.parent.joinpath(str(save_path_obj.stem)+ ".wav"))
@@ -421,32 +452,33 @@ class Anon():
         print("out_audio: ", out_audio)
         FNULL = open(os.devnull, 'w')
         command_make_audio = ["ffmpeg", "-y", "-i", vid_path_obj, "-vn", out_audio]
-        command_make_combined = ["ffmpeg", "-y", "-i", save_path, "-i", out_audio, "-c:v", "copy", "-c:a", "aac", "-map", "0:v:0", "-map", "1:a:0", out_full_video]
-        command_rename = ["mv", out_full_video, save_path]
+        command_make_combined = ["ffmpeg", "-y", "-i", self.save_path, "-i", out_audio, "-c:v", "copy", "-c:a", "aac", "-map", "0:v:0", "-map", "1:a:0", out_full_video]
+        command_rename = ["mv", out_full_video, self.save_path]
         subprocess.run(command_make_audio, stdout=FNULL, stderr=subprocess.STDOUT)
         subprocess.run(command_make_combined, stdout=FNULL, stderr=subprocess.STDOUT)
-        os.remove(save_path)
-        os.remove(save_path[:-4]+".wav")
+        os.remove(self.save_path)
+        os.remove(self.save_path[:-4]+".wav")
         subprocess.run(command_rename, stdout=FNULL, stderr=subprocess.STDOUT)
         
 # Driver function
 def main():
     vid_dir = os.getcwd() + "/static/assets/test_data/vids/vids_test_load_func/test1.mp4"
-    anon = Anon(vid_dir)
+    save_path = os.getcwd() + "/static/assets/test_data/vids/processed/testsave1.mp4"
+    anon = Anon(vid_dir, save_path)
     t1 = time.time()
-    print("TIME after construction: ", t1-t0)
+    print("TIME after construction: ", t1-T_START)
     anon.anon_static()
-    anon.save_vid(os.getcwd() + "/static/assets/test_data/vids/processed/testsave1.mp4")
+    anon.save_audio()
     t6 = time.time()
-    print("TIME after saving: ", t6-t0)
+    print("TIME after saving: ", t6-T_START)
     # anon.play_vid(anon.frames)
     
     print("Shape frames:", np.shape(anon.frames))
     print("One frame shape: ", np.shape(anon.frames[0]))
 
 # Driver function used for testing and debugging
-def main_test():
-    vid_dir = os.getcwd() + "/static/assets/test_data/vids/vids_test_load_func/test2.mp4"
+def main_test_p1():
+    vid_dir = os.getcwd() + "/../kumbayuni_backup/static/assets/test_data/vids/vids_test_load_func/zoom_0.mp4"
     print("Vid_dir: ", vid_dir)
     path_dir = Path(vid_dir)
     # Downsample video file using ffmpeg
@@ -454,23 +486,47 @@ def main_test():
     command_get_shape = "ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 " + vid_dir
     command_rename = ["mv", os.path.join(path_dir.parent, "lowres"+path_dir.name), vid_dir]
 
-    num_frames = subprocess.run(command_get_frames.split(), stdout=subprocess.PIPE).stdout.decode("utf-8")
-    print("Num frames: ", num_frames)
+    num_frames = int(subprocess.run(command_get_frames.split(), stdout=subprocess.PIPE).stdout.decode("utf-8"))
     width, height = subprocess.run(command_get_shape.split(), stdout=subprocess.PIPE).stdout.decode("utf-8").split("x")
-    print("pre Width height: ", width, ", ", height)
+    print("Original width, height: ", width, ", ", height)
     width, height = (int(width), int(height))
-    if width > 1500 or height > 1500:
-        print("Supposedly adjusting said properties")
-        scale = 1500/max(width, height)
+    scale  = 1
+    if width > 1000 or height > 1000:
+        scale = 1000/max(width, height)
         width = int(width * scale)
         height = int(height * scale)
-        
-        command_lowres = "ffmpeg -i " + vid_dir + " -s " + str(width) + "x" + str(height) + " -vcodec mpeg4 -q:v 20 -acodec copy " + os.path.join(path_dir.parent, "lowres"+path_dir.name)
+        command_lowres = "ffmpeg -y -i " + vid_dir + " -s " + str(width) + "x" + str(height) + " -vcodec mpeg4 -q:v 20 -acodec copy " + os.path.join(path_dir.parent, "lowres"+path_dir.name)
         subprocess.run(command_lowres.split())
+        vid_dir = os.path.join(path_dir.parent, "lowres"+path_dir.name)
         # os.remove(vid_dir)
         # subprocess.run(command_rename, stdout=FNULL, stderr=subprocess.STDOUT)
     print("Width height: ", width, ", ", height)
+    t1 = time.time()
+    print("TIME after downsampling: ", t1-T_START)
     vid = cv.VideoCapture(vid_dir)
-    
+    vid.release()
+    t2 = time.time()
+    print("TIME after loading into vid capture: ", t2-T_START)
+
+def main_test_p2():
+    anon = Anon()
+    arr = np.empty((625, 1000, 3))
+    rect = [390, 216, 268, 268]
+    shape = [0, 625, 1000, 3]
+    p1 = (int(max(0,rect[0])), int(max(0,rect[1])))
+    p2 = (int(min(shape[2],rect[0]+rect[2])), int(min(shape[1],rect[1]+rect[3])))
+    cv.rectangle(arr, p1, p2, (255, 255, 0), 4)
+    # rect = [396.7890625, 82.728515625, 61.748046875, 61.748046875]
+    rect = anon._get_larger_rect(rect)
+    # rect = anon._get_larger_rect(rect)
+    p1 = (int(max(0,rect[0])), int(max(0,rect[1])))
+    p2 = (int(min(shape[2],rect[0]+rect[2])), int(min(shape[1],rect[1]+rect[3])))
+    cv.rectangle(arr, p1, p2, (255, 255, 0), 4)
+    print("overlap", anon._overlap_area([390, 216, 268, 268], [396.7890625, 82.728515625, 61.748046875, 61.748046875]))
+
+    cv.imshow("frame", arr)
+    cv.waitKey(0)
+    cv.destroyAllWindows()
+     
 if __name__ == "__main__":
     main()
