@@ -62,19 +62,24 @@ class Anon():
         self.scale = 1
         if width > 1000 or height > 1000:
             self.scale = 1000/max(width, height)
-            width = int(width * self.scale)
-            height = int(height * self.scale)
-            if not os.path.isfile(os.path.join(path_dir.parent, "lowres"+path_dir.name)):
-                command_lowres = "ffmpeg -y -i " + vid_dir + " -s " + str(width) + "x" + str(height) + " -vcodec mpeg4 -q:v 20 -acodec copy " + os.path.join(path_dir.parent, "lowres"+path_dir.name)
-                subprocess.run(command_lowres.split(), stdout=FNULL, stderr=subprocess.STDOUT)
-            vid_dir_old = vid_dir
-            vid_dir = os.path.join(path_dir.parent, "lowres"+path_dir.name)
+            width_big = int(width * self.scale)
+            height_big = int(height * self.scale)
+        if width > 720 or height > 720:
+            self.scale_small = 720/max(width, height)
+            width_small = int(width * self.scale_small)
+            height_small = int(height* self.scale_small)
+            # if not os.path.isfile(os.path.join(path_dir.parent, "lowres"+path_dir.name)):
+            #     command_lowres = "ffmpeg -y -i " + vid_dir + " -s " + str(width) + "x" + str(height) + " -vcodec mpeg4 -q:v 20 -acodec copy " + os.path.join(path_dir.parent, "lowres"+path_dir.name)
+            #     subprocess.run(command_lowres.split(), stdout=FNULL, stderr=subprocess.STDOUT)
+            # vid_dir_old = vid_dir
+            # vid_dir = os.path.join(path_dir.parent, "lowres"+path_dir.name)
             # os.remove(vid_dir)
             # subprocess.run(command_rename, stdout=FNULL, stderr=subprocess.STDOUT)
-        print("Width height: ", width, ", ", height)
-        self.shape = (num_frames, height, width, 3)
+        print("Width height: ", width_small, ", ", height_small)
+        print("big Width height: ", width_big, ", ", height_big)
+        self.shape = (num_frames, height_small, width_small, 3)
         self.vid = cv.VideoCapture(vid_dir)
-        self.vid_big = cv.VideoCapture(vid_dir_old)
+        # self.vid_big = cv.VideoCapture(vid_dir_old)
         t1 = time.time()
         print("TIME after downsampling: ", t1-T_START)
         t2 = time.time()
@@ -83,22 +88,22 @@ class Anon():
         print("Video FPS: ", self.fps)
         scale_frame = int(self.shape[0]/4000)
         print("scale_frame: ", scale_frame)
-        small_shape = (int(self.shape[0]/scale_frame)+1, self.shape[1], self.shape[2], 3)
-        print("Shape and total_frames: ", small_shape, ", ", self.shape[0])
-        self.frames_step = np.empty(small_shape, np.dtype('uint8'))
-        for i_small, i_big in enumerate(range(0,self.shape[0],scale_frame)):
-            if i_small%1000 == 0:
-                print("i_small in construct: ", i_small)
-            self.vid_big.set(cv.CAP_PROP_POS_FRAMES, i_big)
+        step_shape = (int(self.shape[0]/scale_frame)+1, height_big, width_big, 3)
+        print("Shape and total_frames: ", step_shape, ", ", self.shape[0])
+        self.frames_step = np.empty(step_shape, np.dtype('uint8'))
+        for i_step, i_big in enumerate(range(0,self.shape[0],scale_frame)):
+            if i_step%1000 == 0:
+                print("i_step in construct: ", i_step)
+            self.vid.set(cv.CAP_PROP_POS_FRAMES, i_big)
             ret, frame = self.vid_big.read()
-            frame = cv.resize(frame, (small_shape[2],small_shape[1]))
+            frame = cv.resize(frame, (step_shape[2],step_shape[1]))
             if ret:
-                self.frames_step[i_small] = frame
-                # cv.imshow("frame", self.frames_step[i_small])
+                self.frames_step[i_step] = frame
+                # cv.imshow("frame", self.frames_step[i_step])
                 # cv.waitKey(0)
             else:
                 break
-        self.vid_big.set(cv.CAP_PROP_POS_FRAMES, 0)
+        self.vid.set(cv.CAP_PROP_POS_FRAMES, 0)
         t3 = time.time()
         print("TIME after reading through all the frames: ", t3-T_START)
         
@@ -170,7 +175,12 @@ class Anon():
         rects = [rects[index] for index in ind_sort]
         quants.sort(reverse=True)
         return rects, quants
-
+    
+    def _adjust_rect_resolution(self, rect):
+        adjust = self.scale_small/self.scale
+        rect = [elem*adjust for elem in rect]
+        return rect
+    
     # Function used to find the rectangles bordering faces in an image, using facial recognition
     # Returns an array of an array of rectangles per frame. Also returns another array (of the same shape)
     # with the corresponding quantizations
@@ -207,7 +217,7 @@ class Anon():
             front_faces = face_cascade.detectMultiScale(gray, 1.1, 2)
             
             # TODO: Do you need this order (redundant?)?
-            rects, quant_rect = self._order_rects([list(elem) for elem in front_faces])
+            rects, quant_rect = self._order_rects([self._adjust_rect_resolution(elem) for elem in front_faces])
             
             if not rects:
                 rects = [[0,0,0,0]]
@@ -223,12 +233,12 @@ class Anon():
                 left_side_faces = prof_face_cascade.detectMultiScale(cv.flip(gray, 1), 1.1, 4)
 
                 # Since the face detection is built for right side_faces, we need to flip back the flipped rectangles that were created
-                left_side_faces = [[self.shape[2]-curr_rect[0]-curr_rect[2], curr_rect[1], curr_rect[2], curr_rect[3]] for curr_rect in left_side_faces]
+                left_side_faces = [self._adjust_rect_resolution([self.shape[2]-curr_rect[0]-curr_rect[2], curr_rect[1], curr_rect[2], curr_rect[3]]) for curr_rect in left_side_faces]
                 
                 if not list(right_side_faces):
                     both_side_faces = left_side_faces
                 else:
-                    both_side_faces = left_side_faces.extend([list(elem) for elem in right_side_faces])
+                    both_side_faces = left_side_faces.extend([self._adjust_rect_resolution(elem) for elem in right_side_faces])
                 max_both_rect = self._find_greatest_rect(both_side_faces)
                 if max_both_rect and (max_both_rect[3] > ZOOM_HEIGHT):
                     
@@ -404,7 +414,7 @@ class Anon():
     
     def _draw_rects(self, rects):
         # Main container for all the frames in the video
-        shape_frames = list(self.frames_step.shape)
+        shape_frames = list(self.shape)
         shape_frames[0] = self.scale_frame
         shape_frames = tuple(shape_frames)
         for i, rects_frame in enumerate(rects):  # Loop through all the frames in the sampled array
@@ -420,6 +430,7 @@ class Anon():
             self.frames = np.empty(shape_frames, np.dtype('uint8'))
             for k in range(0, k_end):
                 ret, frame = self.vid.read()
+                frame = cv.resize(frame, (self.shape[2],self.shape[1]))
                 # if self.shape[0] <= k or not ret:
                 #     k_end = k
                 #     break
@@ -478,10 +489,10 @@ class Anon():
         
 # Driver function
 def main():
-    # vid_dir = os.getcwd() + "/static/assets/test_data/vids/vids_test_load_func/test2.mp4"
-    # save_path = os.getcwd() + "/static/assets/test_data/vids/processed/testsave2.mp4"
-    vid_dir = os.getcwd() + "/../kumbayuni_backup/static/assets/test_data/vids/vids_test_load_func/zoom_0.mp4"
-    save_path = os.getcwd() + "/../kumbayuni_backup/static/assets/test_data/vids/processed/zoom_0.mp4"
+    vid_dir = os.getcwd() + "/static/assets/test_data/vids/vids_test_load_func/test1.mp4"
+    save_path = os.getcwd() + "/static/assets/test_data/vids/processed/testsave1.mp4"
+    # vid_dir = os.getcwd() + "/../kumbayuni_backup/static/assets/test_data/vids/vids_test_load_func/zoom_0.mp4"
+    # save_path = os.getcwd() + "/../kumbayuni_backup/static/assets/test_data/vids/processed/zoom_0.mp4"
 
     anon = Anon(vid_dir, save_path)
     t1 = time.time()
@@ -554,4 +565,4 @@ def main_test_p2():
         
      
 if __name__ == "__main__":
-    main_test_p2()
+    main()
