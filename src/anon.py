@@ -78,15 +78,22 @@ class Anon():
         print("Width height: ", width_small, ", ", height_small)
         print("big Width height: ", width_big, ", ", height_big)
         self.shape = (num_frames, height_small, width_small, 3)
+        
+        # Videowriter instance variables
         self.vid = cv.VideoCapture(vid_dir)
+        self.save_path = save_path
+        self.fps = self.vid.get(cv.CAP_PROP_FPS)
+        self.writer = cv.VideoWriter(save_path,  
+                         cv.VideoWriter_fourcc(*'mp4v'), 
+                         self.fps, (self.shape[2], self.shape[1]))
+        print("setting writer fps; ", self.writer.get(cv.CAP_PROP_FPS), " to ", self.fps)
         # self.vid_big = cv.VideoCapture(vid_dir_old)
         t1 = time.time()
         print("TIME after downsampling: ", t1-T_START)
         t2 = time.time()
         print("TIME after loading into vid capture: ", t2-T_START)
-        self.fps = self.vid.get(cv.CAP_PROP_FPS)
         print("Video FPS: ", self.fps)
-        scale_frame = int(self.shape[0]/4000)
+        scale_frame = int(self.shape[0]/50)
         print("scale_frame: ", scale_frame)
         step_shape = (int(self.shape[0]/scale_frame)+1, height_big, width_big, 3)
         print("Shape and total_frames: ", step_shape, ", ", self.shape[0])
@@ -95,7 +102,7 @@ class Anon():
             if i_step%1000 == 0:
                 print("i_step in construct: ", i_step)
             self.vid.set(cv.CAP_PROP_POS_FRAMES, i_big)
-            ret, frame = self.vid_big.read()
+            ret, frame = self.vid.read()
             frame = cv.resize(frame, (step_shape[2],step_shape[1]))
             if ret:
                 self.frames_step[i_step] = frame
@@ -107,13 +114,7 @@ class Anon():
         t3 = time.time()
         print("TIME after reading through all the frames: ", t3-T_START)
         
-        # Videowriter instance variables
-        self.save_path = save_path
 
-        self.writer = cv.VideoWriter(save_path,  
-                         cv.VideoWriter_fourcc(*'mp4v'), 
-                         self.fps, (self.shape[2], self.shape[1]))
-        print("setting writer fps; ", self.writer.get(cv.CAP_PROP_FPS), " to ", self.fps)
 
         # Store various metadata
         self.frames = None
@@ -159,8 +160,9 @@ class Anon():
     
     # This function enlarges every rect by a constant factor (to full cover the heady and upper body)
     def _get_larger_rect(self, rect):
-        rect_big = [int(max(0,rect[0]-0.65*rect[2])), int(max(0,rect[1]-0.45*rect[3])),
-                    int(min(self.shape[2],2.3*rect[2])), int(min(self.shape[1],1.9*rect[3]))]
+        
+        rect_big = [int(max(0,rect[0]-0.65*rect[2]-0.07*self.shape[2])), int(max(0,rect[1]-0.45*rect[3]-0.07*self.shape[1])),
+                    int(min(self.shape[2],2.3*rect[2]+0.14*self.shape[2])), int(min(self.shape[1],1.9*rect[3]+0.14*self.shape[1]))]
         return rect_big
 
     # Orders array of rectangles of greatest to least (as determined by _rect_func), and returns their quantized values
@@ -191,7 +193,7 @@ class Anon():
         i_last_large_head = 0
         
         # The 4 here is the number of seconds that it will check profile faces for (since detecting the last large face)
-        max_frames_large_head = int(4*self.fps/self.scale_frame)
+        max_frames_large_head = int(8*self.fps/self.scale_frame)
 
         # Load the face classifer
         #prof_face_cascade = cv.CascadeClassifier('/System/Volumes/Data/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/site-packages/cv2/data/haarcascade_profileface.xml')
@@ -214,7 +216,7 @@ class Anon():
             # faster runtime, but a higher probability of detection misses.
             # minNeighbors--- Higher value results in less detections but with higher quality.
             # 3~6 is a good value for it.
-            front_faces = face_cascade.detectMultiScale(gray, 1.1, 2)
+            front_faces = face_cascade.detectMultiScale(gray, 1.1, 5)
             
             # TODO: Do you need this order (redundant?)?
             rects, quant_rect = self._order_rects([self._adjust_rect_resolution(elem) for elem in front_faces])
@@ -229,8 +231,8 @@ class Anon():
             # If there has been a large face detected "recently" (as defined earlier) and there
             # is no large face now, run face detection for profile faces as well
             if (rects[0][3] < ZOOM_HEIGHT) and (i_last_large_head < max_frames_large_head):
-                right_side_faces = prof_face_cascade.detectMultiScale(gray, 1.1, 4)
-                left_side_faces = prof_face_cascade.detectMultiScale(cv.flip(gray, 1), 1.1, 4)
+                right_side_faces = prof_face_cascade.detectMultiScale(gray, 1.1, 5)
+                left_side_faces = prof_face_cascade.detectMultiScale(cv.flip(gray, 1), 1.1, 5)
 
                 # Since the face detection is built for right side_faces, we need to flip back the flipped rectangles that were created
                 left_side_faces = [self._adjust_rect_resolution([self.shape[2]-curr_rect[0]-curr_rect[2], curr_rect[1], curr_rect[2], curr_rect[3]]) for curr_rect in left_side_faces]
@@ -265,10 +267,10 @@ class Anon():
         
     # Smooth out the plot of the largest rectangle areas across all the frames. 
     # Do this adding a large rectangle to a given frame, if there were x (x may just be 1) large
-    # rectangles at most y seconds ago (y will probably be about 20 for large videos)
-    def smooth_largest(self, rects, quants, x, y):
-        threshold_frames = int(self.fps*y/self.scale_frame)
-        
+    # rectangles at most y seconds ago (y will probably be about 20 for large rectangles and 5 for small rectangles)
+    def smooth_largest(self, rects, quants, x, y_small, y_big):
+        threshold_frames_small = int(self.fps*y_small/self.scale_frame)
+        threshold_frames_big = int(self.fps*y_big/self.scale_frame)
         num_large = 1
         frames_since_large = 0
         avg_large_rect = [0,0,0,0]
@@ -291,7 +293,7 @@ class Anon():
                 frames_since_large = 0
 
             # If this isn't a large rectangle, but there has been one recently, apply the smoothing
-            elif frames_since_large < threshold_frames and num_large >= x:
+            elif frames_since_large < threshold_frames_big and num_large >= x:
                 if avg_large_rect[2] != 0:
                     insert_rect = [avg_large_rect[0]-frames_since_large, avg_large_rect[1]-frames_since_large, avg_large_rect[2]+frames_since_large, avg_large_rect[3]+frames_since_large]
                     rects_curr.append(insert_rect)
@@ -312,20 +314,25 @@ class Anon():
                 ind_small, small_rect_match = self._check_avg(avg_small_rects, rects[i][j])
                 if ind_small is not None:
                     new_avg = np.add(avg_small_rects[ind_small][:-2], rects[i][j])/2
-                    avg_small_rects[ind_small] = list(np.append(new_avg, [0,avg_small_rects[ind_small][5]+1]))
+                    avg_small_rects[ind_small] = list(np.append(new_avg, [min(0, avg_small_rects[ind_small][4]),avg_small_rects[ind_small][5]+1]))
                 else:
                     avg_small_rects_curr.append(list(np.append(rects[i][j].copy(),[0,0])))
                     
             # For all rectangles in avg_small_rects but not in rects (and within threshold frames ago), apply smoothing algorithm
             for j, avg_rect in enumerate(avg_small_rects):
-                if avg_rect[4] != 0 and avg_rect[4] < threshold_frames:
+                if avg_rect[4] < threshold_frames_small:
                     # If there was more than one rectangle like this recently, then smooth
                     if avg_rect[2] != 0  and avg_rect[5] >= x:
                         insert_rect = [avg_rect[0]-avg_rect[4], avg_rect[1]-avg_rect[4], avg_rect[2]+avg_rect[4], avg_rect[3]+avg_rect[4]]
                         rects_curr.append(insert_rect)
-                elif avg_rect[4] != 0:
+                    # This is to bolster the face detection more for regular rectangles
+                    if avg_rect[5] > x:
+                        avg_small_rects[j][4] -= 1
+                        avg_small_rects[j][5] -= 1
+                else:
                     avg_small_remove.append(avg_rect)
                 avg_small_rects[j][4] += 1
+
             # Add or remove the stored rects for this iteration "i"
             for elem in avg_small_rects_curr:
                 avg_small_rects.append(elem)
@@ -348,10 +355,10 @@ class Anon():
         # plt.figure()
         # plt.plot(first_elem_quant_rect, color='b')
 
-        quant_rect_tot, rects_tot = self.smooth_largest(rects_tot, quant_rect_tot, 2, 25)
+        quant_rect_tot, rects_tot = self.smooth_largest(rects_tot, quant_rect_tot, 4, 45, 5)
         t3 = time.time()
         print("TIME after smooth forward: ", t3-T_START)
-        quant_rect_tot, rects_tot = self.smooth_largest(rects_tot[::-1], quant_rect_tot[::-1], 2, 25)
+        quant_rect_tot, rects_tot = self.smooth_largest(rects_tot[::-1], quant_rect_tot[::-1], 4, 45, 5)
         quant_rect_tot = quant_rect_tot[::-1]
         rects_tot = rects_tot[::-1]
         t4 = time.time()
@@ -424,7 +431,7 @@ class Anon():
                 k_end = self.shape[0] - (self.frames_step.shape[0]-1)*self.scale_frame
             else:
                 k_end = self.scale_frame
-            shape_frames = list(self.frames_step.shape)
+            shape_frames = list(self.shape)
             shape_frames[0] = k_end
             shape_frames = tuple(shape_frames)
             self.frames = np.empty(shape_frames, np.dtype('uint8'))
@@ -481,8 +488,8 @@ class Anon():
         command_make_audio = ["ffmpeg", "-y", "-i", vid_path_obj, "-vn", out_audio]
         command_make_combined = ["ffmpeg", "-y", "-i", self.save_path, "-i", out_audio, "-c:v", "copy", "-c:a", "aac", "-map", "0:v:0", "-map", "1:a:0", out_full_video]
         command_rename = ["mv", out_full_video, self.save_path]
-        subprocess.run(command_make_audio, stdout=FNULL, stderr=subprocess.STDOUT)
-        subprocess.run(command_make_combined, stdout=FNULL, stderr=subprocess.STDOUT)
+        subprocess.run(command_make_audio, stdout=FNULL)
+        subprocess.run(command_make_combined, stdout=FNULL)
         os.remove(self.save_path)
         os.remove(self.save_path[:-4]+".wav")
         subprocess.run(command_rename, stdout=FNULL, stderr=subprocess.STDOUT)
