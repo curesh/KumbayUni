@@ -60,7 +60,7 @@ class Anon():
         print("Original width, height: ", width, ", ", height)
         width, height = (int(width), int(height))
         self.scale = 1
-        if width > 1000 or height > 1000:
+        if width > 720 or height > 720:
             self.scale = 1000/max(width, height)
             width_big = int(width * self.scale)
             height_big = int(height * self.scale)
@@ -93,24 +93,25 @@ class Anon():
         t2 = time.time()
         print("TIME after loading into vid capture: ", t2-T_START)
         print("Video FPS: ", self.fps)
-        scale_frame = int(self.shape[0]/50)
+        scale_frame = int(self.shape[0]/2000)
         print("scale_frame: ", scale_frame)
-        step_shape = (int(self.shape[0]/scale_frame)+1, height_big, width_big, 3)
-        print("Shape and total_frames: ", step_shape, ", ", self.shape[0])
-        self.frames_step = np.empty(step_shape, np.dtype('uint8'))
-        for i_step, i_big in enumerate(range(0,self.shape[0],scale_frame)):
-            if i_step%1000 == 0:
-                print("i_step in construct: ", i_step)
-            self.vid.set(cv.CAP_PROP_POS_FRAMES, i_big)
-            ret, frame = self.vid.read()
-            frame = cv.resize(frame, (step_shape[2],step_shape[1]))
-            if ret:
-                self.frames_step[i_step] = frame
-                # cv.imshow("frame", self.frames_step[i_step])
-                # cv.waitKey(0)
-            else:
-                break
-        self.vid.set(cv.CAP_PROP_POS_FRAMES, 0)
+        
+        self.shape_step = (int(self.shape[0]/scale_frame)+1, height_big, width_big, 3)
+        print("Shape and total_frames: ", self.shape_step, ", ", self.shape[0])
+        # self.frames_step = np.empty(self.step_shape, np.dtype('uint8'))
+        # for i_step, i_big in enumerate(range(0,self.shape[0],scale_frame)):
+        #     if i_step%1000 == 0:
+        #         print("i_step in construct: ", i_step)
+        #     self.vid.set(cv.CAP_PROP_POS_FRAMES, i_big)
+        #     ret, frame = self.vid.read()
+        #     frame = cv.resize(frame, (step_shape[2],step_shape[1]))
+        #     if ret:
+        #         self.frames_step[i_step] = frame
+        #         # cv.imshow("frame", self.frames_step[i_step])
+        #         # cv.waitKey(0)
+        #     else:
+        #         break
+        # self.vid.set(cv.CAP_PROP_POS_FRAMES, 0)
         t3 = time.time()
         print("TIME after reading through all the frames: ", t3-T_START)
         
@@ -119,7 +120,6 @@ class Anon():
         # Store various metadata
         self.frames = None
         self.vid_dir = vid_dir
-        self.shape_step = np.shape(self.frames_step)
         self.scale_frame = scale_frame
         self.standard_rect = [int(self.shape[2]/3), int(self.shape[1]/3),
                               int(self.shape[2]/3), int(self.shape[1]/3)]
@@ -161,8 +161,8 @@ class Anon():
     # This function enlarges every rect by a constant factor (to full cover the heady and upper body)
     def _get_larger_rect(self, rect):
         
-        rect_big = [int(max(0,rect[0]-0.65*rect[2]-0.07*self.shape[2])), int(max(0,rect[1]-0.45*rect[3]-0.07*self.shape[1])),
-                    int(min(self.shape[2],2.3*rect[2]+0.14*self.shape[2])), int(min(self.shape[1],1.9*rect[3]+0.14*self.shape[1]))]
+        rect_big = [int(max(0,rect[0]-0.3*rect[2]-0.07*self.shape[2])), int(max(0,rect[1]-0.15*rect[3]-0.07*self.shape[1])),
+                    int(min(self.shape[2],1.6*rect[2]+0.14*self.shape[2])), int(min(self.shape[1],1.3*rect[3]+0.14*self.shape[1]))]
         return rect_big
 
     # Orders array of rectangles of greatest to least (as determined by _rect_func), and returns their quantized values
@@ -179,7 +179,8 @@ class Anon():
         return rects, quants
     
     def _adjust_rect_resolution(self, rect):
-        adjust = self.scale_small/self.scale
+        # adjust = self.scale_small/self.scale
+        adjust = self.scale_small
         rect = [elem*adjust for elem in rect]
         return rect
     
@@ -187,7 +188,7 @@ class Anon():
     # Returns an array of an array of rectangles per frame. Also returns another array (of the same shape)
     # with the corresponding quantizations
     def _find_zoom(self):
-        area_zoom = ZOOM_HEIGHT*ZOOM_WIDTH*(self.scale**2)
+        area_zoom = ZOOM_HEIGHT*ZOOM_WIDTH*(self.scale_small**2)
         quant_rect_tot = []
         rects_tot = []
         i_last_large_head = 0
@@ -200,14 +201,22 @@ class Anon():
         #face_cascade = cv.CascadeClassifier('./assets/haarfiles/haarcascade_frontalface_default.xml')
         prof_face_cascade = cv.CascadeClassifier('static/assets/haarfiles/haarcascade_profileface.xml')
         face_cascade = cv.CascadeClassifier('static/assets/haarfiles/haarcascade_frontalface_default.xml')        
+        
+        # self.frames_step = np.empty(self.step_shape, np.dtype('uint8'))
+
         # For every frame in the sampled video, detect frontal faces (and sometimes profile faces depending on certain parameters)
-        for i,  curr_frame in enumerate(self.frames_step):
-            if i%50 == 0:
-                print("i: ", i)     
+        # for i,  curr_frame in enumerate(self.frames_step):
+        for i_step, i_big in enumerate(range(0,self.shape[0],self.scale_frame)):
+            self.vid.set(cv.CAP_PROP_POS_FRAMES, i_big)
+            ret, curr_frame = self.vid.read()
+            if not ret:
+                break
+            # curr_frame = cv.resize(curr_frame, (step_shape[2],step_shape[1]))
+            if i_step%100 == 0:
+                print("i in find_zoom: ", i_step)     
             
             gray = cv.cvtColor(curr_frame, cv.COLOR_BGR2GRAY)
             
-            # prof_face_cascade = cv.CascadeClassifier('./lbpcascade_profileface.xml')
             # detectMultiScale(...) Params:
             # Image---
             # scaleFactor--- To detect large and small faces alike, the program repeatedly
@@ -216,23 +225,28 @@ class Anon():
             # faster runtime, but a higher probability of detection misses.
             # minNeighbors--- Higher value results in less detections but with higher quality.
             # 3~6 is a good value for it.
-            front_faces = face_cascade.detectMultiScale(gray, 1.1, 5)
-            
+            front_faces = face_cascade.detectMultiScale(gray, 1.2, 5)
+            # for rect in front_faces:
+            #     rect = [int(el) for el in rect]
+            #     cv.rectangle(curr_frame, (rect[0], rect[1]), (rect[0]+rect[2], rect[1]+rect[3]), (255, 0, 0), 3)
+            # cv.imshow("frame", curr_frame)
+            # cv.waitKey(0)
             # TODO: Do you need this order (redundant?)?
             rects, quant_rect = self._order_rects([self._adjust_rect_resolution(elem) for elem in front_faces])
             
             if not rects:
-                rects = [[0,0,0,0]]
-                quant_rect = [0]
+                rects = []
+                quant_rect = []
             
-            if rects[0][3] > ZOOM_HEIGHT:
+            if rects and rects[0][3] > ZOOM_HEIGHT:
                 i_last_large_head = 0
+
 
             # If there has been a large face detected "recently" (as defined earlier) and there
             # is no large face now, run face detection for profile faces as well
-            if (rects[0][3] < ZOOM_HEIGHT) and (i_last_large_head < max_frames_large_head):
-                right_side_faces = prof_face_cascade.detectMultiScale(gray, 1.1, 5)
-                left_side_faces = prof_face_cascade.detectMultiScale(cv.flip(gray, 1), 1.1, 5)
+            if rects and (rects[0][3] < ZOOM_HEIGHT) and (i_last_large_head < max_frames_large_head):
+                right_side_faces = prof_face_cascade.detectMultiScale(gray, 1.2, 5)
+                left_side_faces = prof_face_cascade.detectMultiScale(cv.flip(gray, 1), 1.2, 5)
 
                 # Since the face detection is built for right side_faces, we need to flip back the flipped rectangles that were created
                 left_side_faces = [self._adjust_rect_resolution([self.shape[2]-curr_rect[0]-curr_rect[2], curr_rect[1], curr_rect[2], curr_rect[3]]) for curr_rect in left_side_faces]
@@ -251,7 +265,8 @@ class Anon():
             quant_rect_tot.append(quant_rect)
             rects_tot.append(rects)
             i_last_large_head += 1
-            
+
+        self.vid.set(cv.CAP_PROP_POS_FRAMES, 0)
         return quant_rect_tot, rects_tot
 
     
@@ -284,7 +299,7 @@ class Anon():
             # rectangles
             # NOTE: The 0.8 here is an important parameter and should be supplied from elsewhere
             is_large = 0
-            if rects[i][0][3] > max(int(avg_large_rect[3]*0.8),ZOOM_HEIGHT):
+            if rects[i] and rects[i][0][3] > max(int(avg_large_rect[3]*0.8),ZOOM_HEIGHT):
                 is_large = 1
                 if avg_large_rect[2] == 0:
                     avg_large_rect = rects[i][0].copy()
@@ -341,7 +356,6 @@ class Anon():
             for elem in rects_curr:
                 rects[i].append(elem)    
             rects[i], quants[i] = self._order_rects(rects[i])
-            
         return quants, rects
     
     # Overarching anonymization function
@@ -349,21 +363,23 @@ class Anon():
         quant_rect_tot, rects_tot = self._find_zoom()
         t2 = time.time()
         print("TIME after _find_zoom(): ", t2-T_START)
-        first_elem_quant_rect = [vec[0] for vec in quant_rect_tot]
+        first_elem_quant_rect = [vec[0] for vec in quant_rect_tot if vec]
 
         # This plots the quantizations of the rectangles, before smoothing
         # plt.figure()
         # plt.plot(first_elem_quant_rect, color='b')
 
-        quant_rect_tot, rects_tot = self.smooth_largest(rects_tot, quant_rect_tot, 4, 45, 5)
+        quant_rect_tot, rects_tot = self.smooth_largest(rects_tot, quant_rect_tot, 2, 50, 5)
         t3 = time.time()
         print("TIME after smooth forward: ", t3-T_START)
-        quant_rect_tot, rects_tot = self.smooth_largest(rects_tot[::-1], quant_rect_tot[::-1], 4, 45, 5)
+        quant_rect_tot, rects_tot = self.smooth_largest(rects_tot[::-1], quant_rect_tot[::-1], 2, 50, 5)
         quant_rect_tot = quant_rect_tot[::-1]
         rects_tot = rects_tot[::-1]
         t4 = time.time()
         print("TIME after smooth backwards: ", t4-T_START)
+
         quant_rect_tot, rects_tot = self._remove_overlapping(rects_tot)
+
         t_remove_overlap = time.time()
         print("TIME after remove overlap: ", t_remove_overlap-T_START)
         self._draw_rects(rects_tot)
@@ -396,7 +412,6 @@ class Anon():
             check_rects = rects_frame.copy()
             nonoverlap_rects = []
             nonoverlap_quants = []
-            
             while check_rects:
                 
                 # This is the largest rectangle in whats left (of check_rects), not necessarily the largest in the frame
@@ -424,11 +439,18 @@ class Anon():
         shape_frames = list(self.shape)
         shape_frames[0] = self.scale_frame
         shape_frames = tuple(shape_frames)
+        # for i in range(20):
+        #     ret, frame = self.vid.read()
+        #     print("frame check: ", np.uint8(frame))
+        #     cv.imshow("frame", np.uint8(frame))
+        #     cv.waitKey(0)
+        self.vid.set(cv.CAP_PROP_POS_FRAMES, 0)
+        
         for i, rects_frame in enumerate(rects):  # Loop through all the frames in the sampled array
             if i%200 == 0:
                 print("i in draw_rects: ", i)
             if i == len(rects)-1:
-                k_end = self.shape[0] - (self.frames_step.shape[0]-1)*self.scale_frame
+                k_end = self.shape[0] - (self.shape_step[0]-1)*self.scale_frame
             else:
                 k_end = self.scale_frame
             shape_frames = list(self.shape)
@@ -438,11 +460,11 @@ class Anon():
             for k in range(0, k_end):
                 ret, frame = self.vid.read()
                 frame = cv.resize(frame, (self.shape[2],self.shape[1]))
-                # if self.shape[0] <= k or not ret:
-                #     k_end = k
-                #     break
+                if self.shape[0] <= k or not ret:
+                    k_end = k
+                    break
                 self.frames[k] = frame
-                
+            # print("self frames: ", self.frames)
             for j, rect in enumerate(rects_frame):   # Loop through all the rectangles in a single frame
                 if rect[2] == 0:
                     rects[i].remove(rect)
@@ -452,8 +474,12 @@ class Anon():
                 p1 = (int(max(0,rect[0])), int(max(0,rect[1])))
                 p2 = (int(min(self.shape[2],rect[0]+rect[2])), int(min(self.shape[1],rect[1]+rect[3])))
                 sub_face_index = [p1[1],p2[1],p1[0],p2[0]]
-                sub_face = self.frames_step[i][sub_face_index[0]:sub_face_index[1],sub_face_index[2]:sub_face_index[3]]
+                # print("self.frames[0]: ", self.frames[0])
+                sub_face = self.frames[0][sub_face_index[0]:sub_face_index[1],sub_face_index[2]:sub_face_index[3]]
                 sub_face = cv.GaussianBlur(sub_face, (171, 171), 60)
+                
+                # print("subface: ", sub_face)
+                # print("p1, p2: ", sub_face_index)
                 for k in range(0, k_end):   # Loop through the frames in between two adjacent sampled frames
                     # cv.rectangle(self.frames[k], p1, p2, (255, 255, 0), 4)
                     self.frames[k][sub_face_index[0]:sub_face_index[1],sub_face_index[2]:sub_face_index[3]] = sub_face
@@ -488,18 +514,20 @@ class Anon():
         command_make_audio = ["ffmpeg", "-y", "-i", vid_path_obj, "-vn", out_audio]
         command_make_combined = ["ffmpeg", "-y", "-i", self.save_path, "-i", out_audio, "-c:v", "copy", "-c:a", "aac", "-map", "0:v:0", "-map", "1:a:0", out_full_video]
         command_rename = ["mv", out_full_video, self.save_path]
-        subprocess.run(command_make_audio, stdout=FNULL)
-        subprocess.run(command_make_combined, stdout=FNULL)
+        if subprocess.run(command_make_audio, stdout=FNULL, stderr=subprocess.STDOUT).returncode != 0:
+            sys.exit("Error in audio subprocess")
+        if subprocess.run(command_make_combined, stdout=FNULL, stderr=subprocess.STDOUT).returncode != 0:
+            sys.exit("Error in make combined command")
         os.remove(self.save_path)
         os.remove(self.save_path[:-4]+".wav")
         subprocess.run(command_rename, stdout=FNULL, stderr=subprocess.STDOUT)
         
 # Driver function
 def main():
-    vid_dir = os.getcwd() + "/static/assets/test_data/vids/vids_test_load_func/test1.mp4"
-    save_path = os.getcwd() + "/static/assets/test_data/vids/processed/testsave1.mp4"
-    # vid_dir = os.getcwd() + "/../kumbayuni_backup/static/assets/test_data/vids/vids_test_load_func/zoom_0.mp4"
-    # save_path = os.getcwd() + "/../kumbayuni_backup/static/assets/test_data/vids/processed/zoom_0.mp4"
+    # vid_dir = os.getcwd() + "/static/assets/test_data/vids/vids_test_load_func/zoom_0_crop.mp4"
+    # save_path = os.getcwd() + "/static/assets/test_data/vids/processed/testsave1.mp4"
+    vid_dir = os.getcwd() + "/../kumbayuni_backup/static/assets/test_data/vids/vids_test_load_func/zoom_0.mp4"
+    save_path = os.getcwd() + "/../kumbayuni_backup/static/assets/test_data/vids/processed/zoom_0.mp4"
 
     anon = Anon(vid_dir, save_path)
     t1 = time.time()
@@ -519,11 +547,11 @@ def main_test_p1():
     cap = cv.VideoCapture(os.getcwd() + "/../kumbayuni_backup/static/assets/test_data/vids/vids_test_load_func/zoom_0.mp4")
     cap.set(cv.CAP_PROP_POS_FRAMES, 12977)
     ret, img = cap.read()
-    scale = 720/img.shape[1]
-    img = cv.resize(img, (int(img.shape[1]*scale),int(img.shape[0]*scale)))
-    cv.imshow("face", img)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
+    # scale = 720/img.shape[1]
+    # img = cv.resize(img, (int(img.shape[1]*scale),int(img.shape[0]*scale)))
+    # cv.imshow("face", img)
+    # cv.waitKey(0)
+    # cv.destroyAllWindows()
     prof_face_cascade = cv.CascadeClassifier('static/assets/haarfiles/haarcascade_profileface.xml')
     face_cascade = cv.CascadeClassifier('static/assets/haarfiles/haarcascade_frontalface_default.xml')        
     
