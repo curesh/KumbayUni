@@ -25,16 +25,11 @@ Features:
 
 Urgent Todo for tmrw:
 1. Now, get notification system working for background jobs.
-2. (Done check) It is a good idea to create a bulk upload option in the forms where you can upload a zip without having to enter in all those boxes for each one
 3. FavIcon
 4. deploy
 5. (Maybe) Make the smooth blur box size increase a function of the fps downsampling (cause sometimes it increases a lot and sometimes it doesn't)
 6. Record your own zoom video as a demo on the website
 Status:
-Also need to fully deploy website onto the infinityfree domain or heroku.
-
-Ways to lower execution time:
-1. downsample video altogether at beginning instead of frame by frame
 
 Table of execution times based on input
 Input ---------- Notes ---- time (sec/frame)

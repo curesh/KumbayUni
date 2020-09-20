@@ -7,12 +7,18 @@
     
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+
+    <!-- Select2 Dropdown Menu Search Feature -->
+    <!-- <link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.6/css/bootstrap.min.css" rel="stylesheet"> -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.10.0/css/bootstrap-select.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/css/select2.min.css" rel="stylesheet">
     
-    <!-- Other sortable link
-    <script src="https://cdn.jsdelivr.net/gh/RubaXa/Sortable/Sortable.min.js"></script>
-    -->
     <!-- Latest Sortable -->
     <script src="http://SortableJS.github.io/Sortable/Sortable.js"></script>
+
+    <link rel="shortcut icon" 
+      type="image/x-icon" 
+      href="favicon.ico">
 
     <title>{% block title %} {% endblock %}</title>
   </head>
@@ -56,8 +62,47 @@
     
     <!-- Optional JavaScript -->
     <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <!-- <script src="jquery-csv.js"></script> -->
     <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.2.4/jquery.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/js/select2.min.js"></script>
+    <script type="text/javascript">
+
+    $(document).ready(function() {
+        $.ajax({
+          url: "https://api.jsonbin.io/b/5f6650d9302a837e9569822b/4",
+          type: "GET",
+          quietMillis: 1000,
+          cache: true,
+          success: function(data, textStatus, jqXHR)
+          {
+          // var xdata = data;
+          var xdata = $.map(data, function (obj) {
+            obj.id = obj.text;
+            obj.text = obj.text;
+            return obj;
+          });
+          $("#university").select2({
+            width: "50%",
+            
+            placeholder: "Choose one",
+            data:xdata
+          });
+          
+          },
+          error: function (request, textStatus, errorThrown) {
+          swal("Error ", request.responseJSON.message, "error");
+          if(request.status == "401"){
+          alert("Unauthorized Access ");
+          return false;
+          }
+          }
+        });
+    });
+    </script>
   </body>
 </html>

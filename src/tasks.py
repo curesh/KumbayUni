@@ -60,12 +60,12 @@ def anonymize_video(user_id, orig_load_file, orig_save_file):
             print("Current anonymization: ", row[2])
             _set_task_progress(0)
             load_file = os.path.join(orig_load_file, row[2])
-            save_file = os.path.join(orig_save_file, row[2][:-3]+"avi")
+            save_file = os.path.join(orig_save_file, row[2][:-3]+"mp4")
             title, description = get_meta(row)
-            anon_obj = Anon(load_file)
+            anon_obj = Anon(load_file, save_file)
             anon_obj.anon_static()
             # WARNING: You are rewriting the original video file here
-            anon_obj.save_vid(save_file)
+            anon_obj.save_audio()
             link_hash = upload(save_file, title, description)
             open_db = True
             curr, conn = get_db_connection()

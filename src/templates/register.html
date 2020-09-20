@@ -6,7 +6,7 @@
         {{ form.hidden_tag() }}
         <p>
             {{ form.first_name.label }}<br>
-            {{ form.first_name(size=16) }}<br>
+            {{ form.first_name(size=50) }}<br>
             {% for error in form.first_name.errors %}
             <span style="color: red;">[{{ error }}]</span>
             {% endfor %}
@@ -19,10 +19,11 @@
             {% endfor %}
         </p>
         <p>
-            {{ form.university.label }}<br>
-            {{ form.university(size=64) }}<br>
+            {{ form.university.label }}
+            <small class="text-muted">{{ form.university.description }}</small><br>
+            {{ form.university(class_="form-control") }}
             {% for error in form.university.errors %}
-            <span style="color: red;">[{{ error }}]</span>
+            <span class="label label-danger">{{ error }}</span>
             {% endfor %}
         </p>
         <p>

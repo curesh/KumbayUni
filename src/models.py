@@ -7,7 +7,7 @@ import rq
 from flask import current_app
 
 class User(UserMixin):
-    def __init__(self, user_id, name, email, password, active = True):
+    def __init__(self, user_id, name, email, password, active=True):
         self.id = user_id
         self.name = name
         self.email = email

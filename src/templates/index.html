@@ -1,14 +1,20 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    <h1>{% block title %} Welcome to KumbayUni {% endblock %}</h1>
-    {% if current_user.is_authenticated %}
-    <h3>Hi, {{ current_user.name }}!</h3>
-    {% endif %}
-    <iframe src="https://www.youtube.com/embed/YQHsXMglC9A" width="853" height="480" frameborder="0" allowfullscreen></iframe>
+    <br>
+    <h1>{% block title %}
+        {% if current_user.is_authenticated %}
+        Hi {{ current_user.name }}, welcome back!
+        {% else %}
+        Welcome to KumbayUni 
+        {% endif %}
+        
+    {% endblock %}</h1>
+    <br>
+    <br>
     {% for link in links %}
         <a href="{{ url_for('link', link_id=link['link_id']) }}">
-            <h2>{{ link['title'] }}</h2>
+            <h4>{{ link['title'] }}</h4>
         </a>
         <span class="badge badge-primary">{{ link['created'] }}</span>
         <hr>

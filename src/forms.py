@@ -1,7 +1,11 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, BooleanField, SubmitField, validators
+from wtforms import SelectField, SelectMultipleField, StringField, PasswordField, BooleanField, SubmitField, validators
 from wtforms.validators import ValidationError, DataRequired, Email, EqualTo
 from src.models import User, get_db_connection
+
+class NonValidatingSelectField(SelectField):
+    def pre_validate(self, form):
+        pass
 
 class LoginForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired()])
@@ -12,7 +16,11 @@ class LoginForm(FlaskForm):
 class RegistrationForm(FlaskForm):
     first_name = StringField('First Name', validators=[DataRequired()])
     last_name = StringField('Last Name', validators=[DataRequired()])
-    university = StringField('University', validators=[DataRequired()])
+    # university = StringField('University', validators=[DataRequired()])
+    university = NonValidatingSelectField(u"University", [],
+            choices=[("0", "")],
+            description="Select your university",
+            render_kw={}, coerce=str)
     username = StringField('Username', validators=[DataRequired()])
     email = StringField('Email', validators=[DataRequired(), Email()])
     password = PasswordField('Password', validators=[DataRequired()])

@@ -15,13 +15,16 @@ from google.oauth2 import service_account
 import googleapiclient.discovery
 from zipfile import ZipFile
 import shutil
+from elasticsearch import Elasticsearch
 
 # _________INIT___________
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
     app.redis = Redis.from_url(app.config['REDIS_URL'])
-    app.task_queue = rq.Queue('src-tasks', connection=app.redis)
+    app.task_queue = rq.Queue('src-tasks', connection=app.redis, job_timeout="40m")
+    app.elasticsearch = Elasticsearch([app.config['ELASTICSEARCH_URL']]) \
+        if app.config['ELASTICSEARCH_URL'] else None
     return app
 
 app = create_app(Config)
@@ -81,16 +84,22 @@ def logout():
 def register():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
-    form = RegistrationForm()
-    if form.validate_on_submit():
-        curr, conn = get_db_connection()
-        curr.execute("INSERT INTO users (first_name, last_name, university, username, email, password_hash) VALUES (?, ?, ?, ?, ?, ?)",
-                     (form.first_name.data, form.last_name.data, form.university.data, form.username.data, form.email.data, form.password.data)
-                     )
-        conn.commit()
-        conn.close()
-        flash('Congratulations, you are now a registered user!')
-        return redirect(url_for('login'))
+    form = RegistrationForm(request.form)
+    if request.method == "POST":
+        print("request: ", request.form['university'])
+        if str(request.form['university']) == "0":
+            flash("Please select a university")
+            return render_template('register.html', title='Register', form=form)
+        if form.validate_on_submit():
+            print("validating: ")
+            curr, conn = get_db_connection()
+            curr.execute("INSERT INTO users (first_name, last_name, university, username, email, password_hash) VALUES (?, ?, ?, ?, ?, ?)",
+                        (form.first_name.data, form.last_name.data, request.form['university'], form.username.data, form.email.data, form.password.data)
+                        )
+            conn.commit()
+            conn.close()
+            flash('Congratulations, you are now a registered user!')
+            return redirect(url_for('login'))
     return render_template('register.html', title='Register', form=form)
 
 @app.route('/')
@@ -135,10 +144,6 @@ def allowed_images(filename):
 def create():
 
     if request.method == 'POST':
-        # print("File_type: ", request.form['FileType'])
-        # print("simpleList: ", request.form.getlist('letters[]'))
-        # print("Unknown test: ", "unknown" in request.form )
-        # print("Next button?: ", request.form["NextButton"])
         print("request forms: ", request.form)
         load_file = os.path.join(app.config['UPLOAD_FOLDER'], "original")
         
@@ -154,16 +159,10 @@ def create():
                 # Actual Code
                 f = request.files['file']
                 load_file = os.path.join(app.config['UPLOAD_FOLDER'], "original")
-                # curr_path = os.getcwd()
-                # os.chdir(load_file)
-                f.save(os.path.join(load_file, secure_filename(f.filename)))
-                # os.chdir(curr_path)
-                
+                f.save(os.path.join(load_file, secure_filename(f.filename)))                
                 # Handles zip file or video file submission
                 if request.form["FileType"] == "Compressed zip file":
                     try:
-                        print("f: ", f)
-                        print("secure_filename(for zip try): ", secure_filename(f.filename))
                         with ZipFile(os.path.join(load_file,secure_filename(f.filename)), 'r') as zipObj:
                             zipObj.extractall(load_file)
                         os.remove(os.path.join(load_file,secure_filename(f.filename)))
@@ -192,9 +191,6 @@ def create():
                     curr.execute("INSERT INTO lectures (file_name, course_num, course_name, term, year, class_type, description, lecture_num, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                                 (file_name, request.form['course_num'], request.form['course_name'], request.form['Term'], int(request.form['Year']), 
                                 request.form['Instruction'], request.form['description'], i+1, user_id_curr))
-                    # except:
-                    #     print("Error in inserting ", file_name, " into database. That lecture is already there (UNIQUE failed). -CS")
-                    # finally:
                     conn.commit()
                 if incorrect_input:
                     for f_remove in os.listdir(load_file):
@@ -234,49 +230,6 @@ def create():
                 current_user.launch_task('anonymize_video', 'Uploading video...', load_file, save_file)
             return redirect(url_for('index'))
 
-    return render_template('create.html')
-    
-    if request.method == 'POST':
-        f = request.files['file']
-        print("f ", f)
-        if not f:
-            flash('File is required')
-        title = request.form['title']
-        load_file = os.path.join(app.config['UPLOAD_FOLDER'], "original")
-        save_file = os.path.join(app.config['UPLOAD_FOLDER'], "processed", secure_filename(f.filename)[:-3]+"avi")
-        print("filename: ", f.filename)
-        if not title:
-            flash('Title is required!')
-        elif f.filename == "":
-            flash('Video must have filename')
-        elif not allowed_images(f.filename):
-            flash('That video extension is not allowed')
-        elif os.stat(load_file).st_size > app.config['MAX_CONTENT_PATH']:
-            flash('Video is too large. Please, split into two videos.')
-        else:
-            curr_path = os.getcwd()
-            os.chdir(load_file)
-            f.save(secure_filename(f.filename))
-            os.chdir(curr_path)
-            print("File uploaded succesfully")
-            load_file = os.path.join(load_file, secure_filename(f.filename))
-            curr, conn = get_db_connection()
-            try:
-                curr.execute('INSERT INTO lectures (file_name) VALUES (?)',
-                             (f.filename,))
-                print("Inserting file into lectures")
-            except:
-                print("Error in inserting ", f.filename, " into database. That lecture is already there (UNIQUE failed). -CS")
-            finally:
-                conn.commit()
-                conn.close()
-                
-            if current_user.get_task_in_progress('anonymize_video'):
-                flash('A video is already being uploaded and anonymized')
-            else:
-                current_user.launch_task('anonymize_video', 'Uploading video...', load_file, save_file, [title, "Temp description"])
-
-            return redirect(url_for('index'))
     return render_template('create.html')
 
 # @app.route('/anon_vid')
