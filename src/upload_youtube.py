@@ -44,7 +44,7 @@ def upload(path, title, description):
 
     service.thumbnails().set(
         videoId=response_upload.get('id'),
-        media_body=MediaFileUpload('static/assets/test_data/imgs/test1_frame.jpg')
+        media_body=MediaFileUpload(os.getcwd() + '/static/assets/test_data/imgs/test1_frame.jpg')
     ).execute()
     
     return response_upload.get('id')
