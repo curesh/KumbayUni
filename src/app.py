@@ -14,12 +14,6 @@ import googleapiclient.discovery
 from zipfile import ZipFile
 import shutil
 from elasticsearch import Elasticsearch
-import logging
-from logging.handlers import SMTPHandler, RotatingFileHandler
-
-
-
-
 
 login = LoginManager(app)
 login.login_view = 'login'

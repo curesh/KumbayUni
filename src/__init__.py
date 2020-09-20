@@ -3,6 +3,8 @@ from src.config import Config
 from flask import Flask
 from redis import Redis
 import rq
+import logging
+from logging.handlers import SMTPHandler, RotatingFileHandler
 
 # _________INIT___________
 def create_app(config_class=Config):
