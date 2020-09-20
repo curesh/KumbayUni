@@ -222,3 +222,5 @@ def create():
 # @login_required
 # def anon_vid():
 #     return redirect(url_for('index.html'))
+if __name__ == '__main__':
+    app.run()
