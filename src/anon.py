@@ -82,7 +82,7 @@ class Anon():
         print("scale_frame: ", self.scale_frame)
         self.num_frames_step = int(self.shape[0]/self.scale_frame)+1
 
-        print("num_frames_step and shape of large matrix: ", self.num_frames_step, ", ", self.shape[0])
+        print("num_frames_step and num_frames: ", self.num_frames_step, ", ", self.shape[0])
 
         # Store various metadata
         self.frames = None
@@ -140,11 +140,22 @@ class Anon():
         quants.sort(reverse=True)
         return rects, quants
     
+    # This function scales the rectangles to the downsampled resolution
     def _adjust_rect_resolution(self, rect):
         adjust = self.scale
         rect = [elem*adjust for elem in rect]
         return rect
     
+    # This function computes the value for the amount of seconds a small rectangle has as a buffer 
+    # in the smoothing algorithm
+    def _get_small_rect_buffer(self):
+        time_secs = int(self.shape[0]/self.fps)
+        if time_secs > 900:
+            return 50
+        elif time_secs < 60:
+            return 8
+        first_val = 8 + 42*(time_secs-60)/840
+        return first_val
     # Function used to find the rectangles bordering faces in an image, using facial recognition
     # Returns an array of an array of rectangles per frame. Also returns another array (of the same shape)
     # with the corresponding quantizations
@@ -155,7 +166,7 @@ class Anon():
         i_last_large_head = 0
         
         # The 4 here is the number of seconds that it will check profile faces for (since detecting the last large face)
-        max_frames_large_head = int(8*self.fps/self.scale_frame)
+        max_frames_large_head = int(5*self.fps/self.scale_frame)
 
         # Load the face classifer
         prof_face_cascade = cv.CascadeClassifier('static/assets/haarfiles/haarcascade_profileface.xml')
@@ -236,7 +247,7 @@ class Anon():
         
     # Smooth out precense of various corresponding rectangles across all the frames. 
     # Do this adding a rectangle to a given frame, if there were x (x may just be 1) similar
-    # rectangles at most y seconds ago (y will probably be about 20 for large rectangles and 5 for small rectangles)
+    # rectangles at most y seconds ago (y will probably be about 20 for small rectangles and 5 for large rectangles)
     def _smooth_largest(self, rects, quants, x, y_small, y_big):
         threshold_frames_small = int(self.fps*y_small/self.scale_frame)
         threshold_frames_big = int(self.fps*y_big/self.scale_frame)
@@ -410,8 +421,8 @@ class Anon():
         # plt.figure()
         # plt.plot(first_elem_quant_rect, color='b')
 
-        quant_rect_tot, rects_tot = self._smooth_largest(rects_tot, quant_rect_tot, 2, 50, 5)
-        quant_rect_tot, rects_tot = self._smooth_largest(rects_tot[::-1], quant_rect_tot[::-1], 2, 50, 5)
+        quant_rect_tot, rects_tot = self._smooth_largest(rects_tot, quant_rect_tot, 2, self._get_small_rect_buffer(), 5)
+        quant_rect_tot, rects_tot = self._smooth_largest(rects_tot[::-1], quant_rect_tot[::-1], 2, self._get_small_rect_buffer(), 5)
         quant_rect_tot = quant_rect_tot[::-1]
         rects_tot = rects_tot[::-1]
         
