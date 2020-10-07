@@ -5,6 +5,7 @@ from redis import Redis
 import rq
 import logging
 from logging.handlers import SMTPHandler, RotatingFileHandler
+import os
 
 # _________INIT___________
 def create_app(config_class=Config):

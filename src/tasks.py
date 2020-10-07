@@ -1,5 +1,5 @@
 import time
-from src.app import create_app
+from src import create_app
 from rq import get_current_job
 from src.models import Task, get_db_connection
 import sys
