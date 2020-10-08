@@ -142,7 +142,6 @@ def allowed_images(filename):
 @app.route('/create', methods=('GET', 'POST'), )
 @login_required
 def create():
-
     if request.method == 'POST':
         print("request forms: ", request.form)
         load_file = os.path.join(app.config['UPLOAD_FOLDER'], "original")
@@ -219,7 +218,7 @@ def create():
                     #TODO Get the correct sqlite command for updating lectures table
                     curr.execute("UPDATE lectures SET lecture_num = (?) WHERE file_name = (?)", (i+1, lec_name))
             else:
-                curr.execute("UPDATE lectures SET lecture_num = (?) WHERE lecture_id = (?)", (1, 1))
+                curr.execute("UPDATE lectures SET lecture_num = (?) WHERE lecture_id = (?)", (request.form['lecture_num'], 1))
             conn.commit()
             conn.close()
             save_file = os.path.join(app.config['UPLOAD_FOLDER'], "processed")

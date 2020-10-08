@@ -4,6 +4,9 @@ from googleapiclient.http import MediaFileUpload
 import os
 import socket
 
+# YOUTUBE AUDITORS PLEASE LOOK AT THE COMMENT BELOW
+# This function uploads the video to my own private youtube account (using the youtube data api) 
+# and then displays the unlisted link on my web application
 def upload(path, title, description):
     CLIENT_SECRET_FILE = os.getcwd() + '/static/assets/client_secret.json'
     # CLIENT_SECRET_FILE = 'client_secret.json'

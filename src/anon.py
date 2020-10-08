@@ -55,8 +55,8 @@ class Anon():
         height = self.vid.get(cv.CAP_PROP_FRAME_HEIGHT)
         print("Original width, height: ", width, ", ", height)
         width, height, num_frames = (int(width), int(height), int(num_frames))
-        if width > 720 or height > 720:
-            self.scale = 720/max(width, height)
+        if width > 1000 or height > 1000:
+            self.scale = 1000/max(width, height)
             width = int(width * self.scale)
             height = int(height * self.scale)
         print("down sampled Width height: ", width, ", ", height)
@@ -82,7 +82,7 @@ class Anon():
         print("scale_frame: ", self.scale_frame)
         self.num_frames_step = int(self.shape[0]/self.scale_frame)+1
 
-        print("num_frames_step and shape of large matrix: ", self.num_frames_step, ", ", self.shape[0])
+        print("num_frames_step and num_frames: ", self.num_frames_step, ", ", self.shape[0])
 
         # Store various metadata
         self.frames = None
@@ -123,8 +123,8 @@ class Anon():
     
     # This function enlarges every rect by a constant factor (to full cover the heady and upper body)
     def _get_larger_rect(self, rect):
-        rect_big = [int(max(0,rect[0]-0.3*rect[2]-0.07*self.shape[2])), int(max(0,rect[1]-0.15*rect[3]-0.07*self.shape[1])),
-                    int(min(self.shape[2],1.6*rect[2]+0.14*self.shape[2])), int(min(self.shape[1],1.3*rect[3]+0.14*self.shape[1]))]
+        rect_big = [int(max(0,rect[0]-0.25*rect[2]-0.07*self.shape[2])), int(max(0,rect[1]-0.13*rect[3]-0.07*self.shape[1])),
+                    int(min(self.shape[2],1.5*rect[2]+0.14*self.shape[2])), int(min(self.shape[1],1.26*rect[3]+0.14*self.shape[1]))]
         return rect_big
 
     # Orders array of rectangles of greatest to least (as determined by _rect_func), and returns their quantized values
@@ -140,11 +140,22 @@ class Anon():
         quants.sort(reverse=True)
         return rects, quants
     
+    # This function scales the rectangles to the downsampled resolution
     def _adjust_rect_resolution(self, rect):
         adjust = self.scale
         rect = [elem*adjust for elem in rect]
         return rect
     
+    # This function computes the value for the amount of seconds a small rectangle has as a buffer 
+    # in the smoothing algorithm
+    def _get_small_rect_buffer(self):
+        time_secs = int(self.shape[0]/self.fps)
+        if time_secs > 900:
+            return 50
+        elif time_secs < 60:
+            return 8
+        first_val = 8 + 42*(time_secs-60)/840
+        return first_val
     # Function used to find the rectangles bordering faces in an image, using facial recognition
     # Returns an array of an array of rectangles per frame. Also returns another array (of the same shape)
     # with the corresponding quantizations
@@ -155,7 +166,7 @@ class Anon():
         i_last_large_head = 0
         
         # The 4 here is the number of seconds that it will check profile faces for (since detecting the last large face)
-        max_frames_large_head = int(8*self.fps/self.scale_frame)
+        max_frames_large_head = int(5*self.fps/self.scale_frame)
 
         # Load the face classifer
         prof_face_cascade = cv.CascadeClassifier('static/assets/haarfiles/haarcascade_profileface.xml')
@@ -179,7 +190,7 @@ class Anon():
             # faster runtime, but a higher probability of detection misses.
             # minNeighbors--- Higher value results in less detections but with higher quality.
             # 3~6 is a good value for it.
-            front_faces = face_cascade.detectMultiScale(gray, 1.2, 5)
+            front_faces = face_cascade.detectMultiScale(gray, 1.3, 5)
 
             rects, quant_rect = self._order_rects([self._adjust_rect_resolution(elem) for elem in front_faces])
             
@@ -193,8 +204,8 @@ class Anon():
             # If there has been a large face detected "recently" (as defined earlier) and there
             # is no large face now, run face detection for profile faces as well
             elif i_last_large_head < max_frames_large_head:
-                right_side_faces = prof_face_cascade.detectMultiScale(gray, 1.2, 5)
-                left_side_faces = prof_face_cascade.detectMultiScale(cv.flip(gray, 1), 1.2, 5)
+                right_side_faces = prof_face_cascade.detectMultiScale(gray, 1.3, 5)
+                left_side_faces = prof_face_cascade.detectMultiScale(cv.flip(gray, 1), 1.3, 5)
 
                 # Since the face detection is built for right side_faces, we need to flip back the flipped rectangles that were created
                 left_side_faces = [self._adjust_rect_resolution([self.shape[2]-curr_rect[0]-curr_rect[2], curr_rect[1],
@@ -236,7 +247,7 @@ class Anon():
         
     # Smooth out precense of various corresponding rectangles across all the frames. 
     # Do this adding a rectangle to a given frame, if there were x (x may just be 1) similar
-    # rectangles at most y seconds ago (y will probably be about 20 for large rectangles and 5 for small rectangles)
+    # rectangles at most y seconds ago (y will probably be about 20 for small rectangles and 5 for large rectangles)
     def _smooth_largest(self, rects, quants, x, y_small, y_big):
         threshold_frames_small = int(self.fps*y_small/self.scale_frame)
         threshold_frames_big = int(self.fps*y_big/self.scale_frame)
@@ -375,10 +386,11 @@ class Anon():
             self.frames = np.empty(shape_frames, np.dtype('uint8'))
             for k in range(0, k_end):
                 ret, frame = self.vid.read()
-                frame = cv.resize(frame, (self.shape[2],self.shape[1]))
                 if not ret:
                     k_end = k
                     break
+                frame = cv.resize(frame, (self.shape[2],self.shape[1]))
+
                 self.frames[k] = frame
             for j, rect in enumerate(rects_frame):   # Loop through all the rectangles in a single frame
                 if rect[2] == 0:
@@ -410,8 +422,8 @@ class Anon():
         # plt.figure()
         # plt.plot(first_elem_quant_rect, color='b')
 
-        quant_rect_tot, rects_tot = self._smooth_largest(rects_tot, quant_rect_tot, 2, 50, 5)
-        quant_rect_tot, rects_tot = self._smooth_largest(rects_tot[::-1], quant_rect_tot[::-1], 2, 50, 5)
+        quant_rect_tot, rects_tot = self._smooth_largest(rects_tot, quant_rect_tot, 2, self._get_small_rect_buffer(), 8)
+        quant_rect_tot, rects_tot = self._smooth_largest(rects_tot[::-1], quant_rect_tot[::-1], 2, self._get_small_rect_buffer(), 8)
         quant_rect_tot = quant_rect_tot[::-1]
         rects_tot = rects_tot[::-1]
         
@@ -469,8 +481,8 @@ class Anon():
         
 # Driver function
 def main():
-    vid_dir = os.getcwd() + "/static/assets/test_data/vids/vids_test_load_func/zoom_0_crop.mp4"
-    save_path = os.getcwd() + "/static/assets/test_data/vids/processed/testsave1.mp4"
+    vid_dir = os.getcwd() + "/../kumbayuni_backup/static/assets/test_data/vids/vids_test_load_func/intro_zoom.mp4"
+    save_path = os.getcwd() + "/../kumbayuni_backup/static/assets/test_data/vids/processed/intro_zoom.mp4"
     # vid_dir = os.getcwd() + "/../kumbayuni_backup/static/assets/test_data/vids/vids_test_load_func/zoom_0.mp4"
     # save_path = os.getcwd() + "/../kumbayuni_backup/static/assets/test_data/vids/processed/zoom_0.mp4"
 
