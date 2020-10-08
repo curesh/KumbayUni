@@ -14,7 +14,6 @@ def upload(path, title, description):
     print("get socket timeout: ", socket.getdefaulttimeout())
     # Get the current date time without microseconds in the appropriate format for youtube uploading
     # upload_date_time = datetime.now().replace(microsecond=0).isoformat() + '.000Z'
-
     request_body = {
         'snippet': {
             'categoryI': 27,

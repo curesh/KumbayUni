@@ -386,10 +386,10 @@ class Anon():
             self.frames = np.empty(shape_frames, np.dtype('uint8'))
             for k in range(0, k_end):
                 ret, frame = self.vid.read()
-                frame = cv.resize(frame, (self.shape[2],self.shape[1]))
                 if not ret:
                     k_end = k
                     break
+                frame = cv.resize(frame, (self.shape[2],self.shape[1]))
                 self.frames[k] = frame
             for j, rect in enumerate(rects_frame):   # Loop through all the rectangles in a single frame
                 if rect[2] == 0:

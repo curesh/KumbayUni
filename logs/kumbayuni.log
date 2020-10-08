@@ -24,3 +24,106 @@ Traceback (most recent call last):
   File "/usr/local/lib/python3.8/site-packages/googleapiclient/http.py", line 907, in execute
     raise HttpError(resp, content, uri=self.uri)
 googleapiclient.errors.HttpError: <HttpError 400 when requesting https://www.googleapis.com/upload/youtube/v3/videos?part=snippet%2Cstatus&alt=json&uploadType=multipart returned "The request metadata specifies an invalid or empty video title.">
+2020-10-08 01:06:15,779 INFO: Kumbayuni startup [in ./src/__init__.py:36]
+2020-10-08 01:06:16,970 INFO: Kumbayuni startup [in ./src/__init__.py:36]
+2020-10-08 01:06:16,970 INFO: Kumbayuni startup [in ./src/__init__.py:36]
+2020-10-08 01:06:49,001 ERROR: Unhandled exception [in ./src/tasks.py:83]
+Traceback (most recent call last):
+  File "./src/tasks.py", line 69, in anonymize_video
+    link_hash = upload(save_file, title, description)
+  File "./src/upload_youtube.py", line 35, in upload
+    response_upload = service.videos().insert(
+  File "/usr/local/lib/python3.8/site-packages/googleapiclient/_helpers.py", line 134, in positional_wrapper
+    return wrapped(*args, **kwargs)
+  File "/usr/local/lib/python3.8/site-packages/googleapiclient/http.py", line 907, in execute
+    raise HttpError(resp, content, uri=self.uri)
+googleapiclient.errors.HttpError: <HttpError 400 when requesting https://www.googleapis.com/upload/youtube/v3/videos?part=snippet%2Cstatus&alt=json&uploadType=multipart returned "The request metadata specifies an invalid or empty video title.">
+2020-10-08 01:06:49,001 ERROR: Unhandled exception [in ./src/tasks.py:83]
+Traceback (most recent call last):
+  File "./src/tasks.py", line 69, in anonymize_video
+    link_hash = upload(save_file, title, description)
+  File "./src/upload_youtube.py", line 35, in upload
+    response_upload = service.videos().insert(
+  File "/usr/local/lib/python3.8/site-packages/googleapiclient/_helpers.py", line 134, in positional_wrapper
+    return wrapped(*args, **kwargs)
+  File "/usr/local/lib/python3.8/site-packages/googleapiclient/http.py", line 907, in execute
+    raise HttpError(resp, content, uri=self.uri)
+googleapiclient.errors.HttpError: <HttpError 400 when requesting https://www.googleapis.com/upload/youtube/v3/videos?part=snippet%2Cstatus&alt=json&uploadType=multipart returned "The request metadata specifies an invalid or empty video title.">
+2020-10-08 01:10:25,750 INFO: Kumbayuni startup [in ./src/__init__.py:36]
+2020-10-08 01:10:26,863 INFO: Kumbayuni startup [in ./src/__init__.py:36]
+2020-10-08 01:10:26,863 INFO: Kumbayuni startup [in ./src/__init__.py:36]
+2020-10-08 01:10:58,315 ERROR: Unhandled exception [in ./src/tasks.py:83]
+Traceback (most recent call last):
+  File "./src/tasks.py", line 69, in anonymize_video
+    link_hash = upload(save_file, title, description)
+  File "./src/upload_youtube.py", line 35, in upload
+    response_upload = service.videos().insert(
+  File "/usr/local/lib/python3.8/site-packages/googleapiclient/_helpers.py", line 134, in positional_wrapper
+    return wrapped(*args, **kwargs)
+  File "/usr/local/lib/python3.8/site-packages/googleapiclient/http.py", line 907, in execute
+    raise HttpError(resp, content, uri=self.uri)
+googleapiclient.errors.HttpError: <HttpError 400 when requesting https://www.googleapis.com/upload/youtube/v3/videos?part=snippet%2Cstatus&alt=json&uploadType=multipart returned "The request metadata specifies an invalid or empty video title.">
+2020-10-08 01:10:58,315 ERROR: Unhandled exception [in ./src/tasks.py:83]
+Traceback (most recent call last):
+  File "./src/tasks.py", line 69, in anonymize_video
+    link_hash = upload(save_file, title, description)
+  File "./src/upload_youtube.py", line 35, in upload
+    response_upload = service.videos().insert(
+  File "/usr/local/lib/python3.8/site-packages/googleapiclient/_helpers.py", line 134, in positional_wrapper
+    return wrapped(*args, **kwargs)
+  File "/usr/local/lib/python3.8/site-packages/googleapiclient/http.py", line 907, in execute
+    raise HttpError(resp, content, uri=self.uri)
+googleapiclient.errors.HttpError: <HttpError 400 when requesting https://www.googleapis.com/upload/youtube/v3/videos?part=snippet%2Cstatus&alt=json&uploadType=multipart returned "The request metadata specifies an invalid or empty video title.">
+2020-10-08 01:15:53,077 INFO: Kumbayuni startup [in ./src/__init__.py:36]
+2020-10-08 01:15:54,160 INFO: Kumbayuni startup [in ./src/__init__.py:36]
+2020-10-08 01:15:54,160 INFO: Kumbayuni startup [in ./src/__init__.py:36]
+2020-10-08 01:16:24,438 ERROR: Unhandled exception [in ./src/tasks.py:84]
+Traceback (most recent call last):
+  File "./src/tasks.py", line 70, in anonymize_video
+    link_hash = upload(save_file, title, description)
+  File "./src/upload_youtube.py", line 35, in upload
+    response_upload = service.videos().insert(
+  File "/usr/local/lib/python3.8/site-packages/googleapiclient/_helpers.py", line 134, in positional_wrapper
+    return wrapped(*args, **kwargs)
+  File "/usr/local/lib/python3.8/site-packages/googleapiclient/http.py", line 907, in execute
+    raise HttpError(resp, content, uri=self.uri)
+googleapiclient.errors.HttpError: <HttpError 400 when requesting https://www.googleapis.com/upload/youtube/v3/videos?part=snippet%2Cstatus&alt=json&uploadType=multipart returned "The request metadata specifies an invalid or empty video title.">
+2020-10-08 01:16:24,438 ERROR: Unhandled exception [in ./src/tasks.py:84]
+Traceback (most recent call last):
+  File "./src/tasks.py", line 70, in anonymize_video
+    link_hash = upload(save_file, title, description)
+  File "./src/upload_youtube.py", line 35, in upload
+    response_upload = service.videos().insert(
+  File "/usr/local/lib/python3.8/site-packages/googleapiclient/_helpers.py", line 134, in positional_wrapper
+    return wrapped(*args, **kwargs)
+  File "/usr/local/lib/python3.8/site-packages/googleapiclient/http.py", line 907, in execute
+    raise HttpError(resp, content, uri=self.uri)
+googleapiclient.errors.HttpError: <HttpError 400 when requesting https://www.googleapis.com/upload/youtube/v3/videos?part=snippet%2Cstatus&alt=json&uploadType=multipart returned "The request metadata specifies an invalid or empty video title.">
+2020-10-08 01:19:20,831 INFO: Kumbayuni startup [in ./src/__init__.py:36]
+2020-10-08 01:19:22,167 INFO: Kumbayuni startup [in ./src/__init__.py:36]
+2020-10-08 01:19:22,167 INFO: Kumbayuni startup [in ./src/__init__.py:36]
+2020-10-08 01:19:52,661 ERROR: Unhandled exception [in ./src/tasks.py:84]
+Traceback (most recent call last):
+  File "./src/tasks.py", line 70, in anonymize_video
+    link_hash = upload(save_file, title, description)
+  File "./src/upload_youtube.py", line 36, in upload
+    response_upload = service.videos().insert(
+  File "/usr/local/lib/python3.8/site-packages/googleapiclient/_helpers.py", line 134, in positional_wrapper
+    return wrapped(*args, **kwargs)
+  File "/usr/local/lib/python3.8/site-packages/googleapiclient/http.py", line 907, in execute
+    raise HttpError(resp, content, uri=self.uri)
+googleapiclient.errors.HttpError: <HttpError 400 when requesting https://www.googleapis.com/upload/youtube/v3/videos?part=snippet%2Cstatus&alt=json&uploadType=multipart returned "The request metadata specifies an invalid or empty video title.">
+2020-10-08 01:19:52,661 ERROR: Unhandled exception [in ./src/tasks.py:84]
+Traceback (most recent call last):
+  File "./src/tasks.py", line 70, in anonymize_video
+    link_hash = upload(save_file, title, description)
+  File "./src/upload_youtube.py", line 36, in upload
+    response_upload = service.videos().insert(
+  File "/usr/local/lib/python3.8/site-packages/googleapiclient/_helpers.py", line 134, in positional_wrapper
+    return wrapped(*args, **kwargs)
+  File "/usr/local/lib/python3.8/site-packages/googleapiclient/http.py", line 907, in execute
+    raise HttpError(resp, content, uri=self.uri)
+googleapiclient.errors.HttpError: <HttpError 400 when requesting https://www.googleapis.com/upload/youtube/v3/videos?part=snippet%2Cstatus&alt=json&uploadType=multipart returned "The request metadata specifies an invalid or empty video title.">
+2020-10-08 01:33:56,281 INFO: Kumbayuni startup [in ./src/__init__.py:36]
+2020-10-08 01:33:57,530 INFO: Kumbayuni startup [in ./src/__init__.py:36]
+2020-10-08 01:33:57,530 INFO: Kumbayuni startup [in ./src/__init__.py:36]

@@ -34,6 +34,13 @@ def get_meta(lecture_row):
     # title = [university]: [course_name] [class_type] [lecture_num] by [first_name] [last_name]
     title = user[3] + ": " + lecture_row[4] + " " + lecture_row[7] + " " + str(lecture_row[9]) + " by " + user[1] + " " + user[2]
     description = "The official course name is " + lecture_row[3] + ". " + "This course was recorded for the " + lecture_row[5] + " " + str(lecture_row[6]) + " academic term. " + lecture_row[8]
+    print("Title of video: ", title)
+    if len(title) > 99:
+        title = user[3] + ": " + lecture_row[3] + " " + lecture_row[7] + " " + str(lecture_row[9]) + " by " + user[1] + " " + user[2]
+        description = "The official course name is " + lecture_row[3] + ": " + lecture_row[4] + ". " + "This course was recorded for the " + lecture_row[5] + " " + str(lecture_row[6]) + " academic term by " + user[1] + " " + user[2] + ". " + lecture_row[8]
+        if len(title) > 99:
+            title = title[0:100]
+    
     return title, description
 
 def sort_table(row):
