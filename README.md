@@ -1,12 +1,10 @@
 # KumbayUni
+
+Check it out at the following link!
+https://kumbayuni.herokuapp.com/
+
+
 WORK IN PROGRESS
-
-Anonmyization feature is complete: to check it out, do the following
-1. Add the file to assets/test_data/vid
-2. Edit the main function in src/anon.py to open assets/test_data/vid/[YOUR_FILE]
-3. Run with python3 src/anon.py
-
-Website is not hosted yet, but you can run locally, using the command "flask run"
 
 Important notes about flask and stuff.
 
