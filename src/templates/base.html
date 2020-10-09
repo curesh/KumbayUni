@@ -38,7 +38,7 @@
           </li>
 
         </ul>
-        <ul class="navbar-nav ml-auto align-items-end">
+        <ul class="navbar-nav ml-auto">
           {% if current_user.is_anonymous %}
           <li class="nav-item active">
             <a class="nav-link" href="{{url_for('login')}}">Login</a>
