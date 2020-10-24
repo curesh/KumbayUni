@@ -55,8 +55,8 @@ class Anon():
         height = self.vid.get(cv.CAP_PROP_FRAME_HEIGHT)
         print("Original width, height: ", width, ", ", height)
         width, height, num_frames = (int(width), int(height), int(num_frames))
-        if width > 720 or height > 720:
-            self.scale = 720/max(width, height)
+        if width > 1000 or height > 1000:
+            self.scale = 1000/max(width, height)
             width = int(width * self.scale)
             height = int(height * self.scale)
         print("down sampled Width height: ", width, ", ", height)
@@ -123,8 +123,8 @@ class Anon():
     
     # This function enlarges every rect by a constant factor (to full cover the heady and upper body)
     def _get_larger_rect(self, rect):
-        rect_big = [int(max(0,rect[0]-0.3*rect[2]-0.07*self.shape[2])), int(max(0,rect[1]-0.15*rect[3]-0.07*self.shape[1])),
-                    int(min(self.shape[2],1.6*rect[2]+0.14*self.shape[2])), int(min(self.shape[1],1.3*rect[3]+0.14*self.shape[1]))]
+        rect_big = [int(max(0,rect[0]-0.25*rect[2]-0.07*self.shape[2])), int(max(0,rect[1]-0.13*rect[3]-0.07*self.shape[1])),
+                    int(min(self.shape[2],1.5*rect[2]+0.14*self.shape[2])), int(min(self.shape[1],1.26*rect[3]+0.14*self.shape[1]))]
         return rect_big
 
     # Orders array of rectangles of greatest to least (as determined by _rect_func), and returns their quantized values
@@ -190,7 +190,7 @@ class Anon():
             # faster runtime, but a higher probability of detection misses.
             # minNeighbors--- Higher value results in less detections but with higher quality.
             # 3~6 is a good value for it.
-            front_faces = face_cascade.detectMultiScale(gray, 1.2, 5)
+            front_faces = face_cascade.detectMultiScale(gray, 1.3, 5)
 
             rects, quant_rect = self._order_rects([self._adjust_rect_resolution(elem) for elem in front_faces])
             
@@ -204,8 +204,8 @@ class Anon():
             # If there has been a large face detected "recently" (as defined earlier) and there
             # is no large face now, run face detection for profile faces as well
             elif i_last_large_head < max_frames_large_head:
-                right_side_faces = prof_face_cascade.detectMultiScale(gray, 1.2, 5)
-                left_side_faces = prof_face_cascade.detectMultiScale(cv.flip(gray, 1), 1.2, 5)
+                right_side_faces = prof_face_cascade.detectMultiScale(gray, 1.3, 5)
+                left_side_faces = prof_face_cascade.detectMultiScale(cv.flip(gray, 1), 1.3, 5)
 
                 # Since the face detection is built for right side_faces, we need to flip back the flipped rectangles that were created
                 left_side_faces = [self._adjust_rect_resolution([self.shape[2]-curr_rect[0]-curr_rect[2], curr_rect[1],
@@ -480,8 +480,8 @@ class Anon():
         
 # Driver function
 def main():
-    vid_dir = os.getcwd() + "/static/assets/test_data/vids/vids_test_load_func/zoom_0_crop.mp4"
-    save_path = os.getcwd() + "/static/assets/test_data/vids/processed/testsave1.mp4"
+    vid_dir = os.getcwd() + "/../kumbayuni_backup/static/assets/test_data/vids/vids_test_load_func/intro_zoom.mp4"
+    save_path = os.getcwd() + "/../kumbayuni_backup/static/assets/test_data/vids/processed/intro_zoom.mp4"
     # vid_dir = os.getcwd() + "/../kumbayuni_backup/static/assets/test_data/vids/vids_test_load_func/zoom_0.mp4"
     # save_path = os.getcwd() + "/../kumbayuni_backup/static/assets/test_data/vids/processed/zoom_0.mp4"
 
